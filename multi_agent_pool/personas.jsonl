@@ -1,0 +1,13 @@
+{"agent_id": "fileagent", "agent_name": "文件处理专家", "category": "tool", "description": "擅长读取、写入、编辑和处理各类文件", "capabilities": ["文件读取", "文件写入", "文件编辑", "文件删除", "文件复制", "目录操作", "文件搜索", "文件压缩", "文件解压", "CSV处理", "JSON处理", "XML处理"]}
+{"agent_id": "arxivagent", "agent_name": "学术搜索专家", "category": "tool", "description": "专门用于搜索和获取学术论文", "capabilities": ["学术搜索", "论文检索", "arxiv搜索", "摘要提取", "论文下载", "引用查找", "作者搜索", "主题搜索"]}
+{"agent_id": "bingagent", "agent_name": "网页搜索专家", "category": "tool", "description": "使用Bing进行网页搜索和信息获取", "capabilities": ["网页搜索", "信息检索", "关键词搜索", "新闻搜索", "图片搜索", "视频搜索", "实时信息", "网络爬虫"]}
+{"agent_id": "websiteagent", "agent_name": "网站访问专家", "category": "tool", "description": "访问和解析网页内容", "capabilities": ["网页访问", "HTML解析", "网页抓取", "内容提取", "链接分析", "网站导航", "表单提交", "动态内容加载"]}
+{"agent_id": "pythonagent", "agent_name": "Python代码执行专家", "category": "tool", "description": "执行Python代码进行计算和数据处理", "capabilities": ["代码执行", "数据计算", "算法实现", "数据分析", "数据可视化", "机器学习", "脚本运行", "调试"]}
+{"agent_id": "reasoningagent", "agent_name": "逻辑推理专家", "category": "reasoning", "description": "进行逻辑推理和分析", "capabilities": ["逻辑推理", "演绎推理", "归纳推理", "因果分析", "问题分析", "步骤推导", "假设验证", "论证构建"]}
+{"agent_id": "criticagent", "agent_name": "批判分析专家", "category": "reasoning", "description": "对信息进行批判性分析和评估", "capabilities": ["批判性思维", "逻辑分析", "假设检验", "证据评估", "偏见识别", "逻辑谬误检测", "质量评估", "可行性分析"]}
+{"agent_id": "reflectagent", "agent_name": "反思改进专家", "category": "reasoning", "description": "反思和改进行动过程", "capability": ["反思", "自我评估", "改进建议", "错误纠正", "优化建议", "方案调整", "效果评估"]}
+{"agent_id": "questionagent", "agent_name": "问题分解专家", "category": "reasoning", "description": "将复杂问题分解为子问题", "capabilities": ["问题分解", "子问题生成", "需求分析", "任务拆分", "目标分解", "疑问生成", "澄清问题"]}
+{"agent_id": "summerizeagent", "agent_name": "总结信息专家", "category": "reasoning", "description": "对信息进行总结和归纳", "capabilities": ["信息总结", "要点提取", "摘要生成", "归纳概括", "关键词提取", "结构化整理", "信息压缩"]}
+{"agent_id": "concludeagent", "agent_name": "得出结论专家", "category": "reasoning", "description": "从信息中得出结论", "capabilities": ["结论推导", "结果归纳", "决策支持", "最终答案", "结果确认", "答案验证"]}
+{"agent_id": "modifieragent", "agent_name": "修正错误专家", "category": "reasoning", "description": "识别和修正错误", "capabilities": ["错误识别", "错误修正", "问题诊断", "纠错", "错误分析", "修复建议"]}
+{"agent_id": "terminateagent", "agent_name": "任务终止专家", "category": "terminate", "description": "结束任务并提取具体结果", "capabilities": ["任务结束", "结果提取", "最终输出", "答案整理", "任务完成", "结果确认", "格式化输出"]}

@@ -1,0 +1,245 @@
+{
+  "decomposition": {
+    "original_task": {
+      "id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d",
+      "title": "GSM_hard_1_",
+      "description": "A robe takes 2287720 bolts of blue fiber and half that much white fiber. How many bolts in total does it take?",
+      "priority": "high",
+      "status": "pending",
+      "created_at": "2026-03-20T15:35:48.700548",
+      "metadata": {}
+    },
+    "sub_tasks": [
+      {
+        "id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0",
+        "title": "理解题目要求",
+        "description": "仔细阅读并理解题目中的信息，明确已知条件和所求目标。题目指出蓝色纤维需要2287720 bolts，白色纤维是蓝色的一半，需要计算总 bolts 数。",
+        "priority": "high",
+        "status": "pending",
+        "estimated_time": 1.0,
+        "required_skills": [
+          "数学理解",
+          "阅读理解"
+        ],
+        "dependencies": [],
+        "metadata": {}
+      },
+      {
+        "id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1",
+        "title": "计算白色纤维的 bolts 数量",
+        "description": "根据题目，白色纤维是蓝色纤维的一半，计算2287720的一半，即1143860 bolts。",
+        "priority": "high",
+        "status": "pending",
+        "estimated_time": 1.0,
+        "required_skills": [
+          "基本算术运算",
+          "除法计算"
+        ],
+        "dependencies": [
+          "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0"
+        ],
+        "metadata": {}
+      },
+      {
+        "id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2",
+        "title": "计算总 bolts 数量",
+        "description": "将蓝色纤维和白色纤维的 bolts 数量相加，即2287720 + 1143860，得出总和。",
+        "priority": "high",
+        "status": "pending",
+        "estimated_time": 1.0,
+        "required_skills": [
+          "基本算术运算",
+          "加法计算"
+        ],
+        "dependencies": [
+          "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0",
+          "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1"
+        ],
+        "metadata": {}
+      }
+    ],
+    "decomposition_strategy": "将问题分解为理解题意、计算白色纤维数量、计算总数三个逐步递进的子任务，确保每个子任务逻辑清晰且任务之间有合理的依赖关系。",
+    "total_estimated_time": 3.0
+  },
+  "matching": {
+    "assignments": [
+      {
+        "subtask_id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0",
+        "subtask_title": "理解题目要求",
+        "required_skills": [
+          "数学理解",
+          "阅读理解"
+        ],
+        "agent_id": "text_extraction",
+        "agent_name": "文本提取智能体",
+        "score": 0
+      },
+      {
+        "subtask_id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1",
+        "subtask_title": "计算白色纤维的 bolts 数量",
+        "required_skills": [
+          "基本算术运算",
+          "除法计算"
+        ],
+        "agent_id": "text_extraction",
+        "agent_name": "文本提取智能体",
+        "score": 0
+      },
+      {
+        "subtask_id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2",
+        "subtask_title": "计算总 bolts 数量",
+        "required_skills": [
+          "基本算术运算",
+          "加法计算"
+        ],
+        "agent_id": "text_extraction",
+        "agent_name": "文本提取智能体",
+        "score": 0
+      }
+    ],
+    "unmatched_subtasks": [],
+    "total_score": 0,
+    "score_matrix": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "execution": {
+    "final_state": {
+      "original_task": {
+        "id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d",
+        "title": "GSM_hard_1_",
+        "description": "A robe takes 2287720 bolts of blue fiber and half that much white fiber. How many bolts in total does it take?",
+        "priority": "high",
+        "status": "pending",
+        "created_at": "2026-03-20T15:35:48.700548",
+        "metadata": {}
+      },
+      "sub_tasks": [
+        {
+          "id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0",
+          "title": "理解题目要求",
+          "description": "仔细阅读并理解题目中的信息，明确已知条件和所求目标。题目指出蓝色纤维需要2287720 bolts，白色纤维是蓝色的一半，需要计算总 bolts 数。",
+          "priority": "high",
+          "status": "pending",
+          "estimated_time": 1.0,
+          "required_skills": [
+            "数学理解",
+            "阅读理解"
+          ],
+          "dependencies": [],
+          "metadata": {}
+        },
+        {
+          "id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1",
+          "title": "计算白色纤维的 bolts 数量",
+          "description": "根据题目，白色纤维是蓝色纤维的一半，计算2287720的一半，即1143860 bolts。",
+          "priority": "high",
+          "status": "pending",
+          "estimated_time": 1.0,
+          "required_skills": [
+            "基本算术运算",
+            "除法计算"
+          ],
+          "dependencies": [
+            "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0"
+          ],
+          "metadata": {}
+        },
+        {
+          "id": "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2",
+          "title": "计算总 bolts 数量",
+          "description": "将蓝色纤维和白色纤维的 bolts 数量相加，即2287720 + 1143860，得出总和。",
+          "priority": "high",
+          "status": "pending",
+          "estimated_time": 1.0,
+          "required_skills": [
+            "基本算术运算",
+            "加法计算"
+          ],
+          "dependencies": [
+            "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0",
+            "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1"
+          ],
+          "metadata": {}
+        }
+      ],
+      "assignments": {
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0": "text_extraction",
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1": "text_extraction",
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2": "text_extraction"
+      },
+      "task_results": {
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0": "### 文本提取与信息结构化\n\n#### 1. 关键信息提取\n\n从题目中提取出以下关键信息：\n\n- **蓝色纤维** 需要的 bolts 数量：**2,287,720**\n- **白色纤维** 需要的 bolts 数量：是蓝色纤维的一半\n- **目标**：计算蓝色纤维和白色纤维的 **总 bolts 数**\n\n---\n\n#### 2. 数值与关系识别\n\n- **蓝色纤维**：2,287,720 bolts\n- **白色纤维**：2,287,720 ÷ 2 = 1,143,860 bolts\n- **总 bolts 数** = 蓝色纤维 + 白色纤维\n\n---\n\n#### 3. 结构化数据呈现\n\n```json\n{\n  \"known_values\": {\n    \"blue_fiber_bolts\": 2287720,\n    \"white_fiber_bolts\": null,\n    \"total_bolts\": null\n  },\n  \"relationships\": {\n    \"white_fiber_bolts\": \"blue_fiber_bolts / 2\",\n    \"total_bolts\": \"blue_fiber_bolts + white_fiber_bolts\"\n  },\n  \"calculation_steps\": [\n    {\n      \"step\": 1,\n      \"operation\": \"division\",\n      \"input\": \"blue_fiber_bolts\",\n      \"value\": 2287720,\n      \"result\": 1143860,\n      \"output\": \"white_fiber_bolts\"\n    },\n    {\n      \"step\": 2,\n      \"operation\": \"addition\",\n      \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n      \"value\": [2287720, 1143860],\n      \"result\": 3431580,\n      \"output\": \"total_bolts\"\n    }\n  ]\n}\n```\n\n---\n\n#### 4. 最终计算结果\n\n- 白色纤维所需 bolts：**1,143,860**\n- 总 bolts 数：**2,287,720 + 1,143,860 = 3,431,580**\n\n✅ **最终答案：3,431,580 bolts**",
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1": "根据提供的文本和上下文信息，以下是提取出的**关键信息**与**结构化数据**，包括数值、实体、关系以及计算过程：\n\n---\n\n### 📌 1. **关键信息提取**\n\n从题目描述中提取的核心信息如下：\n\n- **蓝色纤维**：需要的 bolts 数量为 **2,287,720**\n- **白色纤维**：是蓝色纤维的一半（即 2,287,720 ÷ 2）\n- **目标**：计算蓝色纤维和白色纤维的 **总 bolts 数**\n\n---\n\n### 📊 2. **数字与实体识别**\n\n| 实体 | 数值 | 说明 |\n|------|------|------|\n| `blue_fiber_bolts` | 2,287,720 | 蓝色纤维所需的 bolts 数量 |\n| `white_fiber_bolts` | 1,143,860 | 白色纤维所需 bolts，由蓝色纤维数量除以2得到 |\n| `total_bolts` | 3,431,580 | 总共需要的 bolts（蓝色 + 白色） |\n\n---\n\n### 🔗 3. **关系与运算逻辑**\n\n- 白色纤维的 bolts 数 = 蓝色纤维的 bolts 数 ÷ 2  \n  → `white_fiber_bolts = blue_fiber_bolts / 2`\n\n- 总 bolts 数 = 蓝色纤维 + 白色纤维  \n  → `total_bolts = blue_fiber_bolts + white_fiber_bolts`\n\n---\n\n### 🧮 4. **计算步骤分解**\n\n```json\n[\n  {\n    \"step\": 1,\n    \"operation\": \"division\",\n    \"input\": \"blue_fiber_bolts\",\n    \"value\": 2287720,\n    \"result\": 1143860,\n    \"output\": \"white_fiber_bolts\"\n  },\n  {\n    \"step\": 2,\n    \"operation\": \"addition\",\n    \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n    \"value\": [2287720, 1143860],\n    \"result\": 3431580,\n    \"output\": \"total_bolts\"\n  }\n]\n```\n\n---\n\n### ✅ 5. **最终结果**\n\n- **白色纤维所需 bolts**：**1,143,860**\n- **总 bolts 数**：**3,431,580**\n\n---\n\n### 📦 结构化输出（JSON 格式）\n\n```json\n{\n  \"known_values\": {\n    \"blue_fiber_bolts\": 2287720,\n    \"white_fiber_bolts\": 1143860,\n    \"total_bolts\": 3431580\n  },\n  \"relationships\": {\n    \"white_fiber_bolts\": \"blue_fiber_bolts / 2\",\n    \"total_bolts\": \"blue_fiber_bolts + white_fiber_bolts\"\n  },\n  \"calculation_steps\": [\n    {\n      \"step\": 1,\n      \"operation\": \"division\",\n      \"input\": \"blue_fiber_bolts\",\n      \"value\": 2287720,\n      \"result\": 1143860,\n      \"output\": \"white_fiber_bolts\"\n    },\n    {\n      \"step\": 2,\n      \"operation\": \"addition\",\n      \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n      \"value\": [2287720, 1143860],\n      \"result\": 3431580,\n      \"output\": \"total_bolts\"\n    }\n  ],\n  \"final_answer\": \"3,431,580 bolts\"\n}\n```\n\n---\n\n✅ **所有关键信息与数值已完整提取并结构化**。",
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2": "### ✅ **关键信息与数值提取结果**  \n\n---\n\n#### **1. 关键信息提取**  \n从任务描述和上下文信息中提取的核心信息如下：  \n- **蓝色纤维**：需要的 `bolts` 数量为 **2,287,720**  \n- **白色纤维**：所需 `bolts` 数量是蓝色纤维的一半  \n- **目标**：计算蓝色纤维和白色纤维的 **总 `bolts` 数量**  \n\n---\n\n#### **2. 实体与数值识别**  \n\n| 实体 | 数值 | 说明 |\n|------|------|------|\n| `blue_fiber_bolts` | 2,287,720 | 蓝色纤维所需的 bolts 数量 |\n| `white_fiber_bolts` | 1,143,860 | 白色纤维所需的 bolts 数量（由蓝色纤维数量 ÷ 2 得出） |\n| `total_bolts` | 3,431,580 | 蓝色纤维 + 白色纤维 的总 bolts 数量 |\n\n---\n\n#### **3. 数值与运算关系**  \n\n- **白色纤维 bolts 量**（关系）：  \n  $$\n  \\text{white\\_fiber\\_bolts} = \\frac{\\text{blue\\_fiber\\_bolts}}{2}\n  $$\n\n- **总 bolts 量**（关系）：  \n  $$\n  \\text{total\\_bolts} = \\text{blue\\_fiber\\_bolts} + \\text{white\\_fiber\\_bolts}\n  $$\n\n---\n\n#### **4. 计算步骤（结构化）**  \n\n```json\n[\n  {\n    \"step\": 1,\n    \"operation\": \"division\",\n    \"input\": \"blue_fiber_bolts\",\n    \"value\": 2287720,\n    \"result\": 1143860,\n    \"output\": \"white_fiber_bolts\"\n  },\n  {\n    \"step\": 2,\n    \"operation\": \"addition\",\n    \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n    \"value\": [2287720, 1143860],\n    \"result\": 3431580,\n    \"output\": \"total_bolts\"\n  }\n]\n```\n\n---\n\n#### **5. 最终计算结果**  \n- 白色纤维所需 `bolts`：**1,143,860**  \n- 总 `bolts` 数：**2,287,720 + 1,143,860 = 3,431,580**\n\n✅ **最终答案：3,431,580 bolts**\n\n---\n\n### 📦 **结构化输出（JSON 格式）**  \n\n```json\n{\n  \"known_values\": {\n    \"blue_fiber_bolts\": 2287720,\n    \"white_fiber_bolts\": 1143860,\n    \"total_bolts\": 3431580\n  },\n  \"relationships\": {\n    \"white_fiber_bolts\": \"blue_fiber_bolts / 2\",\n    \"total_bolts\": \"blue_fiber_bolts + white_fiber_bolts\"\n  },\n  \"calculation_steps\": [\n    {\n      \"step\": 1,\n      \"operation\": \"division\",\n      \"input\": \"blue_fiber_bolts\",\n      \"value\": 2287720,\n      \"result\": 1143860,\n      \"output\": \"white_fiber_bolts\"\n    },\n    {\n      \"step\": 2,\n      \"operation\": \"addition\",\n      \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n      \"value\": [2287720, 1143860],\n      \"result\": 3431580,\n      \"output\": \"total_bolts\"\n    }\n  ],\n  \"final_answer\": \"3,431,580 bolts\"\n}\n```"
+      },
+      "task_statuses": {
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0": "success",
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1": "success",
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2": "success"
+      },
+      "completed_tasks": [
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1",
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2",
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0"
+      ],
+      "token_usage": {
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0": {
+          "prompt_tokens": 250,
+          "completion_tokens": 525,
+          "total_tokens": 775
+        },
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1": {
+          "prompt_tokens": 869,
+          "completion_tokens": 894,
+          "total_tokens": 1763
+        },
+        "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2": {
+          "prompt_tokens": 1943,
+          "completion_tokens": 926,
+          "total_tokens": 2869
+        }
+      },
+      "total_tokens": 5407,
+      "errors": {}
+    },
+    "total_tokens": 5407,
+    "task_results": {
+      "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0": "### 文本提取与信息结构化\n\n#### 1. 关键信息提取\n\n从题目中提取出以下关键信息：\n\n- **蓝色纤维** 需要的 bolts 数量：**2,287,720**\n- **白色纤维** 需要的 bolts 数量：是蓝色纤维的一半\n- **目标**：计算蓝色纤维和白色纤维的 **总 bolts 数**\n\n---\n\n#### 2. 数值与关系识别\n\n- **蓝色纤维**：2,287,720 bolts\n- **白色纤维**：2,287,720 ÷ 2 = 1,143,860 bolts\n- **总 bolts 数** = 蓝色纤维 + 白色纤维\n\n---\n\n#### 3. 结构化数据呈现\n\n```json\n{\n  \"known_values\": {\n    \"blue_fiber_bolts\": 2287720,\n    \"white_fiber_bolts\": null,\n    \"total_bolts\": null\n  },\n  \"relationships\": {\n    \"white_fiber_bolts\": \"blue_fiber_bolts / 2\",\n    \"total_bolts\": \"blue_fiber_bolts + white_fiber_bolts\"\n  },\n  \"calculation_steps\": [\n    {\n      \"step\": 1,\n      \"operation\": \"division\",\n      \"input\": \"blue_fiber_bolts\",\n      \"value\": 2287720,\n      \"result\": 1143860,\n      \"output\": \"white_fiber_bolts\"\n    },\n    {\n      \"step\": 2,\n      \"operation\": \"addition\",\n      \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n      \"value\": [2287720, 1143860],\n      \"result\": 3431580,\n      \"output\": \"total_bolts\"\n    }\n  ]\n}\n```\n\n---\n\n#### 4. 最终计算结果\n\n- 白色纤维所需 bolts：**1,143,860**\n- 总 bolts 数：**2,287,720 + 1,143,860 = 3,431,580**\n\n✅ **最终答案：3,431,580 bolts**",
+      "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1": "根据提供的文本和上下文信息，以下是提取出的**关键信息**与**结构化数据**，包括数值、实体、关系以及计算过程：\n\n---\n\n### 📌 1. **关键信息提取**\n\n从题目描述中提取的核心信息如下：\n\n- **蓝色纤维**：需要的 bolts 数量为 **2,287,720**\n- **白色纤维**：是蓝色纤维的一半（即 2,287,720 ÷ 2）\n- **目标**：计算蓝色纤维和白色纤维的 **总 bolts 数**\n\n---\n\n### 📊 2. **数字与实体识别**\n\n| 实体 | 数值 | 说明 |\n|------|------|------|\n| `blue_fiber_bolts` | 2,287,720 | 蓝色纤维所需的 bolts 数量 |\n| `white_fiber_bolts` | 1,143,860 | 白色纤维所需 bolts，由蓝色纤维数量除以2得到 |\n| `total_bolts` | 3,431,580 | 总共需要的 bolts（蓝色 + 白色） |\n\n---\n\n### 🔗 3. **关系与运算逻辑**\n\n- 白色纤维的 bolts 数 = 蓝色纤维的 bolts 数 ÷ 2  \n  → `white_fiber_bolts = blue_fiber_bolts / 2`\n\n- 总 bolts 数 = 蓝色纤维 + 白色纤维  \n  → `total_bolts = blue_fiber_bolts + white_fiber_bolts`\n\n---\n\n### 🧮 4. **计算步骤分解**\n\n```json\n[\n  {\n    \"step\": 1,\n    \"operation\": \"division\",\n    \"input\": \"blue_fiber_bolts\",\n    \"value\": 2287720,\n    \"result\": 1143860,\n    \"output\": \"white_fiber_bolts\"\n  },\n  {\n    \"step\": 2,\n    \"operation\": \"addition\",\n    \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n    \"value\": [2287720, 1143860],\n    \"result\": 3431580,\n    \"output\": \"total_bolts\"\n  }\n]\n```\n\n---\n\n### ✅ 5. **最终结果**\n\n- **白色纤维所需 bolts**：**1,143,860**\n- **总 bolts 数**：**3,431,580**\n\n---\n\n### 📦 结构化输出（JSON 格式）\n\n```json\n{\n  \"known_values\": {\n    \"blue_fiber_bolts\": 2287720,\n    \"white_fiber_bolts\": 1143860,\n    \"total_bolts\": 3431580\n  },\n  \"relationships\": {\n    \"white_fiber_bolts\": \"blue_fiber_bolts / 2\",\n    \"total_bolts\": \"blue_fiber_bolts + white_fiber_bolts\"\n  },\n  \"calculation_steps\": [\n    {\n      \"step\": 1,\n      \"operation\": \"division\",\n      \"input\": \"blue_fiber_bolts\",\n      \"value\": 2287720,\n      \"result\": 1143860,\n      \"output\": \"white_fiber_bolts\"\n    },\n    {\n      \"step\": 2,\n      \"operation\": \"addition\",\n      \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n      \"value\": [2287720, 1143860],\n      \"result\": 3431580,\n      \"output\": \"total_bolts\"\n    }\n  ],\n  \"final_answer\": \"3,431,580 bolts\"\n}\n```\n\n---\n\n✅ **所有关键信息与数值已完整提取并结构化**。",
+      "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2": "### ✅ **关键信息与数值提取结果**  \n\n---\n\n#### **1. 关键信息提取**  \n从任务描述和上下文信息中提取的核心信息如下：  \n- **蓝色纤维**：需要的 `bolts` 数量为 **2,287,720**  \n- **白色纤维**：所需 `bolts` 数量是蓝色纤维的一半  \n- **目标**：计算蓝色纤维和白色纤维的 **总 `bolts` 数量**  \n\n---\n\n#### **2. 实体与数值识别**  \n\n| 实体 | 数值 | 说明 |\n|------|------|------|\n| `blue_fiber_bolts` | 2,287,720 | 蓝色纤维所需的 bolts 数量 |\n| `white_fiber_bolts` | 1,143,860 | 白色纤维所需的 bolts 数量（由蓝色纤维数量 ÷ 2 得出） |\n| `total_bolts` | 3,431,580 | 蓝色纤维 + 白色纤维 的总 bolts 数量 |\n\n---\n\n#### **3. 数值与运算关系**  \n\n- **白色纤维 bolts 量**（关系）：  \n  $$\n  \\text{white\\_fiber\\_bolts} = \\frac{\\text{blue\\_fiber\\_bolts}}{2}\n  $$\n\n- **总 bolts 量**（关系）：  \n  $$\n  \\text{total\\_bolts} = \\text{blue\\_fiber\\_bolts} + \\text{white\\_fiber\\_bolts}\n  $$\n\n---\n\n#### **4. 计算步骤（结构化）**  \n\n```json\n[\n  {\n    \"step\": 1,\n    \"operation\": \"division\",\n    \"input\": \"blue_fiber_bolts\",\n    \"value\": 2287720,\n    \"result\": 1143860,\n    \"output\": \"white_fiber_bolts\"\n  },\n  {\n    \"step\": 2,\n    \"operation\": \"addition\",\n    \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n    \"value\": [2287720, 1143860],\n    \"result\": 3431580,\n    \"output\": \"total_bolts\"\n  }\n]\n```\n\n---\n\n#### **5. 最终计算结果**  \n- 白色纤维所需 `bolts`：**1,143,860**  \n- 总 `bolts` 数：**2,287,720 + 1,143,860 = 3,431,580**\n\n✅ **最终答案：3,431,580 bolts**\n\n---\n\n### 📦 **结构化输出（JSON 格式）**  \n\n```json\n{\n  \"known_values\": {\n    \"blue_fiber_bolts\": 2287720,\n    \"white_fiber_bolts\": 1143860,\n    \"total_bolts\": 3431580\n  },\n  \"relationships\": {\n    \"white_fiber_bolts\": \"blue_fiber_bolts / 2\",\n    \"total_bolts\": \"blue_fiber_bolts + white_fiber_bolts\"\n  },\n  \"calculation_steps\": [\n    {\n      \"step\": 1,\n      \"operation\": \"division\",\n      \"input\": \"blue_fiber_bolts\",\n      \"value\": 2287720,\n      \"result\": 1143860,\n      \"output\": \"white_fiber_bolts\"\n    },\n    {\n      \"step\": 2,\n      \"operation\": \"addition\",\n      \"input\": [\"blue_fiber_bolts\", \"white_fiber_bolts\"],\n      \"value\": [2287720, 1143860],\n      \"result\": 3431580,\n      \"output\": \"total_bolts\"\n    }\n  ],\n  \"final_answer\": \"3,431,580 bolts\"\n}\n```"
+    },
+    "errors": {},
+    "token_usage_by_task": {
+      "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_0": {
+        "prompt_tokens": 250,
+        "completion_tokens": 525,
+        "total_tokens": 775
+      },
+      "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_1": {
+        "prompt_tokens": 869,
+        "completion_tokens": 894,
+        "total_tokens": 1763
+      },
+      "3fa3c418-f379-43c6-9fd9-3291bb93bc8d_subtask_2": {
+        "prompt_tokens": 1943,
+        "completion_tokens": 926,
+        "total_tokens": 2869
+      }
+    }
+  }
+}

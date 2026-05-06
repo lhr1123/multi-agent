@@ -1,0 +1,17 @@
+[project]
+name = "multi-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "datasets>=4.8.5",
+    "langgraph>=1.0.5",
+    "matplotlib>=3.10.9",
+    "openai>=2.14.0",
+    "sentence-transformers>=3.0.0",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true

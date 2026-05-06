@@ -1,0 +1,179 @@
+{
+  "run_at": "2026-04-24T17:23:30.147631",
+  "dataset_path": "dataset/gsm-hard/gsmhardv2.jsonl",
+  "config": {
+    "offset": 0,
+    "limit": 10,
+    "orchestrator_model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "sub_agent_model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "single_baseline_model": null,
+    "quiet_per_sample": true
+  },
+  "multi_agent_metrics": {
+    "total": 10,
+    "correct": 0,
+    "valid_predictions": 0,
+    "failed_runs": 10,
+    "total_tokens": 0,
+    "total_elapsed_seconds": 14.51120924949646,
+    "accuracy": 0.0,
+    "extraction_rate": 0.0,
+    "avg_tokens": 0.0,
+    "avg_elapsed_seconds": 1.451120924949646
+  },
+  "single_baseline_metrics": null,
+  "samples": [
+    {
+      "dataset_index": 0,
+      "target": -9867630.0,
+      "question": "Janet’s ducks lay 16 eggs per day. She eats three for breakfast every morning and bakes muffins for her friends every day with 4933828. She sells the remainder at the farmers' market daily for $2 per fresh duck egg. How much in dollars does she make every day at the farmers' market?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.7835009098052979,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 1,
+      "target": 3431580.0,
+      "question": "A robe takes 2287720 bolts of blue fiber and half that much white fiber.  How many bolts in total does it take?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.3905949592590332,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 2,
+      "target": 322886700.0,
+      "question": "James decides to run 1793815 sprints 1793815 times a week.  He runs 60 meters each sprint.  How many total meters does he run a week?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.4470763206481934,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 3,
+      "target": -6887448.0,
+      "question": "Every day, Wendi feeds each of her chickens three cups of mixed chicken feed, containing seeds, mealworms and vegetables to help keep them healthy.  She gives the chickens their feed in three separate meals. In the morning, she gives her flock of chickens 6887483 cups of feed.  In the afternoon, she gives her chickens another 25 cups of feed.  How many cups of feed does she need to give her chickens in the final meal of the day if the size of Wendi's flock is 20 chickens?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.3444197177886963,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 4,
+      "target": 21459061.0,
+      "question": "Kylar went to the store to buy glasses for his new apartment. One glass costs $5, but every second glass costs only 60% of the price. Kylar wants to buy 5364765 glasses. How much does he need to pay for them?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.4876224994659424,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 5,
+      "target": 82085198.0,
+      "question": "Toulouse has twice as many sheep as Charleston. Charleston has 4 times as many sheep as Seattle. How many sheep do Toulouse, Charleston, and Seattle have together if Seattle has 6314246 sheep?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.2781822681427002,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 6,
+      "target": 74363508.0,
+      "question": "Eliza's rate per hour for the first 40 hours she works each week is $1616598. She also receives an overtime pay of 1.2 times her regular hourly rate. If Eliza worked for 45 hours this week, how much are her earnings for this week?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.525719165802002,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 7,
+      "target": 3244047.0999999996,
+      "question": "A new program had 531811 downloads in the first month. The number of downloads in the second month was three times as many as the downloads in the first month, but then reduced by 30% in the third month. How many downloads did the program have total over the three months?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.3741176128387451,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 8,
+      "target": 17414074.0,
+      "question": "Toula went to the bakery and bought various types of pastries. She bought 3 dozen donuts which cost $5804528 per dozen, 2 dozen mini cupcakes which cost $80 per dozen, and 6 dozen mini cheesecakes for $55 per dozen. How much was the total cost?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.4095048904418945,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    },
+    {
+      "dataset_index": 9,
+      "target": 1.0,
+      "question": "Carlos is planting a lemon tree. The tree will cost $90 to plant. Each year it will grow 2256855 lemons, which he can sell for $1.5 each. It costs $3 a year to water and feed the tree. How many years will it take before he starts earning money on the lemon tree?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.470470905303955,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    }
+  ],
+  "visualization": {
+    "enabled": true,
+    "backend": "svg-fallback",
+    "error": "matplotlib unavailable: No module named 'matplotlib'",
+    "chart_dir": "result\\charts\\gsmhard_eval_output_after_fix",
+    "files": [
+      "result\\charts\\gsmhard_eval_output_after_fix\\quality_metrics.svg",
+      "result\\charts\\gsmhard_eval_output_after_fix\\efficiency_metrics.svg",
+      "result\\charts\\gsmhard_eval_output_after_fix\\cumulative_accuracy.svg",
+      "result\\charts\\gsmhard_eval_output_after_fix\\result_breakdown.svg"
+    ]
+  }
+}

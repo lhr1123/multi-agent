@@ -1,0 +1,53 @@
+{
+  "run_at": "2026-04-24T17:17:09.238411",
+  "dataset_path": "dataset/gsm-hard/gsmhardv2.jsonl",
+  "config": {
+    "offset": 8,
+    "limit": 1,
+    "orchestrator_model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "sub_agent_model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "single_baseline_model": null,
+    "quiet_per_sample": false
+  },
+  "multi_agent_metrics": {
+    "total": 1,
+    "correct": 0,
+    "valid_predictions": 0,
+    "failed_runs": 1,
+    "total_tokens": 0,
+    "total_elapsed_seconds": 1.8092670440673828,
+    "accuracy": 0.0,
+    "extraction_rate": 0.0,
+    "avg_tokens": 0.0,
+    "avg_elapsed_seconds": 1.8092670440673828
+  },
+  "single_baseline_metrics": null,
+  "samples": [
+    {
+      "dataset_index": 8,
+      "target": 17414074.0,
+      "question": "Toula went to the bakery and bought various types of pastries. She bought 3 dozen donuts which cost $5804528 per dozen, 2 dozen mini cupcakes which cost $80 per dozen, and 6 dozen mini cheesecakes for $55 per dozen. How much was the total cost?",
+      "multi_agent": {
+        "prediction": null,
+        "is_correct": false,
+        "tokens": 0,
+        "elapsed_seconds": 1.8092670440673828,
+        "error": "Connection error.",
+        "final_result": ""
+      },
+      "single_baseline": null
+    }
+  ],
+  "visualization": {
+    "enabled": true,
+    "backend": "svg-fallback",
+    "error": "matplotlib unavailable: No module named 'matplotlib'",
+    "chart_dir": "result\\charts\\debug_idx8",
+    "files": [
+      "result\\charts\\debug_idx8\\quality_metrics.svg",
+      "result\\charts\\debug_idx8\\efficiency_metrics.svg",
+      "result\\charts\\debug_idx8\\cumulative_accuracy.svg",
+      "result\\charts\\debug_idx8\\result_breakdown.svg"
+    ]
+  }
+}
