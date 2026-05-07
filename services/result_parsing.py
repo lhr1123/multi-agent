@@ -5,10 +5,10 @@ import re
 from typing import Any, Dict
 
 
-def strip_code_fence(text: str) -> str:
-    if not text:
+def strip_code_fence(text: Any) -> str:
+    if text is None:
         return ""
-    stripped = text.strip()
+    stripped = str(text).strip()
     if stripped.startswith("```"):
         lines = stripped.splitlines()
         if len(lines) >= 2 and lines[-1].strip() == "```":
@@ -16,7 +16,7 @@ def strip_code_fence(text: str) -> str:
     return stripped
 
 
-def safe_json_loads_from_text(content: str) -> Dict[str, Any]:
+def safe_json_loads_from_text(content: Any) -> Dict[str, Any]:
     text = strip_code_fence(content)
     if not text:
         return {}

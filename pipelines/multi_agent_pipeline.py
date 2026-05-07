@@ -15,6 +15,12 @@ from services.result_parsing import extract_workflow_step_result, safe_json_load
 from utils.dependency_utils import sanitize_subtask_dependencies
 
 
+def _safe_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def run_multi_agent_flow(
     llm,
     task_title: str,
@@ -135,7 +141,7 @@ def run_multi_agent_flow(
 
         total_tokens += workflow_result.get("total_tokens", 0)
         step_result = extract_workflow_step_result(workflow_result)
-        response = (step_result.get("response", "") or "").strip()
+        response = _safe_text(step_result.get("response", ""))
         structured = step_result.get("structured_response")
         if not isinstance(structured, dict) or not structured:
             parsed = safe_json_loads_from_text(response)
@@ -215,17 +221,17 @@ def run_multi_agent_flow(
         terminate_result = workflow_manager.execute_workflow()
         total_tokens += terminate_result.get("total_tokens", 0)
         terminate_step_result = extract_workflow_step_result(terminate_result)
-        terminate_response = (terminate_step_result.get("response", "") or "").strip()
+        terminate_response = _safe_text(terminate_step_result.get("response", ""))
         terminate_structured = terminate_step_result.get("structured_response", {})
         if not isinstance(terminate_structured, dict):
             terminate_structured = {}
 
-        candidate = str(terminate_structured.get("final_answer", "") or "").strip()
+        candidate = _safe_text(terminate_structured.get("final_answer", ""))
         if candidate:
             final_result = candidate
         elif terminate_response:
             parsed = safe_json_loads_from_text(terminate_response)
-            final_result = str(parsed.get("final_answer", "") or terminate_response).strip()
+            final_result = _safe_text(parsed.get("final_answer", "") or terminate_response)
 
     if not final_result:
         final_result = merged_result
