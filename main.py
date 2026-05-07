@@ -59,12 +59,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["gsm-hard", "mmlu-pro"],
         help="Benchmark adapter used in dataset mode.",
     )
-    parser.add_argument(
-        "--dataset-limit",
-        type=int,
-        default=20,
-        help="Number of samples to evaluate; <=0 means all samples.",
-    )
+        parser.add_argument(
+            "--dataset-limit",
+            type=int,
+            default=0,
+            help="Number of samples to evaluate; <=0 means all samples.",
+        )
     parser.add_argument(
         "--dataset-offset",
         type=int,
