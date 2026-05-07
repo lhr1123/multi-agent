@@ -10,6 +10,15 @@ Modify model names here to affect the whole project.
   subtask and decide whether to call a tool.
 - `SINGLE_BASELINE_MODEL`:
   Used by the single-LLM baseline in comparison experiments.
+
+This module also supports separate OpenAI-compatible endpoints for:
+
+- task orchestration
+- sub-agent execution
+- single-model baseline
+
+If the role-specific env vars are unset, they fall back to the shared
+`SILICONFLOW_*` values for backward compatibility.
 """
 
 import os
@@ -17,9 +26,41 @@ import os
 from openai import OpenAI
 
 
-# SiliconFlow / OpenAI-compatible client configuration.
+def _env_with_fallback(primary: str, fallback: str, default: str = "") -> str:
+    value = os.getenv(primary)
+    if value:
+        return value
+    value = os.getenv(fallback)
+    if value:
+        return value
+    return default
+
+
+# Shared fallback configuration.
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 SILICONFLOW_BASE_URL = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+
+# Role-specific endpoint configuration.
+TASK_ORCHESTRATOR_API_KEY = _env_with_fallback("TASK_ORCHESTRATOR_API_KEY", "SILICONFLOW_API_KEY")
+TASK_ORCHESTRATOR_BASE_URL = _env_with_fallback(
+    "TASK_ORCHESTRATOR_BASE_URL",
+    "SILICONFLOW_BASE_URL",
+    "https://api.siliconflow.cn/v1",
+)
+
+SUB_AGENT_API_KEY = _env_with_fallback("SUB_AGENT_API_KEY", "SILICONFLOW_API_KEY")
+SUB_AGENT_BASE_URL = _env_with_fallback(
+    "SUB_AGENT_BASE_URL",
+    "SILICONFLOW_BASE_URL",
+    "https://api.siliconflow.cn/v1",
+)
+
+SINGLE_BASELINE_API_KEY = _env_with_fallback("SINGLE_BASELINE_API_KEY", "SILICONFLOW_API_KEY")
+SINGLE_BASELINE_BASE_URL = _env_with_fallback(
+    "SINGLE_BASELINE_BASE_URL",
+    "SILICONFLOW_BASE_URL",
+    "https://api.siliconflow.cn/v1",
+)
 
 
 # Task orchestration layer model.
@@ -38,8 +79,21 @@ SINGLE_BASELINE_MODEL = TASK_ORCHESTRATOR_MODEL
 DEFAULT_MODEL = TASK_ORCHESTRATOR_MODEL
 
 
-# Shared API client instance.
-llm_model = OpenAI(
-    api_key=SILICONFLOW_API_KEY,
-    base_url=SILICONFLOW_BASE_URL,
+# Role-specific API client instances.
+task_orchestrator_llm_model = OpenAI(
+    api_key=TASK_ORCHESTRATOR_API_KEY,
+    base_url=TASK_ORCHESTRATOR_BASE_URL,
 )
+
+sub_agent_llm_model = OpenAI(
+    api_key=SUB_AGENT_API_KEY,
+    base_url=SUB_AGENT_BASE_URL,
+)
+
+single_baseline_llm_model = OpenAI(
+    api_key=SINGLE_BASELINE_API_KEY,
+    base_url=SINGLE_BASELINE_BASE_URL,
+)
+
+# Backward-compatible alias: historical callers defaulted to a single shared client.
+llm_model = task_orchestrator_llm_model

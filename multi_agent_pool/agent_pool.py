@@ -8,7 +8,7 @@ from operator import add
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
-from llm.llm_config import llm_model, SUB_AGENT_MODEL
+from llm.llm_config import SUB_AGENT_MODEL, sub_agent_llm_model
 from question_solution.hungarian_algorithm import hungarian_maximum_assignment
 from models import SubTask
 from semantic_matcher import SemanticMatcher
@@ -55,12 +55,12 @@ class BaseAgent(ABC):
         args:
             agent_id: 智能体唯一ID
             agent_name: 智能体名称
-            client: 模型客户端，默认为llm_config.llm_model
+            client: 模型客户端，默认使用子智能体 endpoint
             model_name: 模型名称，默认为"Pro/zai-org/GLM-4.7"
         """
         self.agent_id = agent_id
         self.agent_name = agent_name
-        self.client = client or llm_model
+        self.client = client or sub_agent_llm_model
         self.model_name = model_name
         self.graph = None
         self.checkpointer = MemorySaver()
@@ -580,7 +580,7 @@ class AgentPool:
             client: llm客户端
             model_name:模型名称
         """
-        self.client = client or llm_model
+        self.client = client or sub_agent_llm_model
         self.model_name = model_name
         self.agents: Dict[str, BaseAgent] = {}
         

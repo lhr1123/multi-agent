@@ -12,7 +12,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 from .actions import ActionRegistry, ActionType
-from llm.llm_config import llm_model, SUB_AGENT_MODEL
+from llm.llm_config import SUB_AGENT_MODEL, sub_agent_llm_model
 
 
 class AgentCategory(Enum):
@@ -97,7 +97,7 @@ class WorkflowManager:
         model_name: str = SUB_AGENT_MODEL,
         persona_file: str = None,
     ):
-        self.client = client or llm_model
+        self.client = client or sub_agent_llm_model
         self.model_name = model_name
 
         self.persona_file = persona_file or self._get_default_persona_path()

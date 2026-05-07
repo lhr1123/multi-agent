@@ -3,14 +3,14 @@ LLM接口抽象类与默认实现
 
 - `LLMInterface`: 抽象接口，定义大模型调用规范
 - `MockLLMInterface`: 简单的Mock实现，方便本地测试
-- `SiliconFlowLLMInterface`: 使用 `llm_config.llm_model`（SiliconFlow/OpenAI兼容）进行真实调用
+- `SiliconFlowLLMInterface`: 使用 OpenAI 兼容客户端进行真实调用
 """
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 import json
 import re
 
-from llm.llm_config import llm_model, DEFAULT_MODEL
+from llm.llm_config import DEFAULT_MODEL, task_orchestrator_llm_model
 
 
 class LLMInterface(ABC):
@@ -115,19 +115,19 @@ class MockLLMInterface(LLMInterface):
 
 class SiliconFlowLLMInterface(LLMInterface):
     """
-    使用 `llm_config.llm_model` 的真实LLM接口实现（SiliconFlow / OpenAI 兼容）
+    使用 OpenAI 兼容客户端的真实LLM接口实现（SiliconFlow / vLLM 兼容）
     
-    默认直接复用你在 `llm_config.py` 中配置好的 `llm_model` 客户端，
-    只需保证环境变量 `SILICONFLOW_API_KEY` 已设置即可正常调用。
+    默认复用任务总控层配置好的客户端；也可以显式传入其他客户端，
+    例如单模型 baseline 的独立 endpoint。
     """
     
     def __init__(self, client=None, model_name: str = DEFAULT_MODEL):
         """
         Args:
-            client: 已初始化的 OpenAI 兼容客户端，默认为 llm_config.llm_model
+            client: 已初始化的 OpenAI 兼容客户端
             model_name: 模型名称（例如 SiliconFlow 上的 Qwen/Qwen2.5-32B-Instruct）
         """
-        self.client = client or llm_model
+        self.client = client or task_orchestrator_llm_model
         self.model_name = model_name or DEFAULT_MODEL
     
     def decompose_task(self, task_title: str, task_description: str,

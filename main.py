@@ -15,6 +15,8 @@ from llm.llm_config import (
     SINGLE_BASELINE_MODEL,
     SUB_AGENT_MODEL,
     TASK_ORCHESTRATOR_MODEL,
+    single_baseline_llm_model,
+    task_orchestrator_llm_model,
 )
 from llm.llm_interface import SiliconFlowLLMInterface
 from pipelines.multi_agent_pipeline import run_multi_agent_flow
@@ -91,8 +93,14 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = build_parser().parse_args()
 
-    orchestrator_llm = SiliconFlowLLMInterface(model_name=TASK_ORCHESTRATOR_MODEL)
-    single_llm = SiliconFlowLLMInterface(model_name=SINGLE_BASELINE_MODEL)
+    orchestrator_llm = SiliconFlowLLMInterface(
+        client=task_orchestrator_llm_model,
+        model_name=TASK_ORCHESTRATOR_MODEL,
+    )
+    single_llm = SiliconFlowLLMInterface(
+        client=single_baseline_llm_model,
+        model_name=SINGLE_BASELINE_MODEL,
+    )
 
     if args.mode == "dataset":
         eval_limit = None if args.dataset_limit is None or args.dataset_limit <= 0 else args.dataset_limit
