@@ -8,7 +8,12 @@ from operator import add
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 
-from llm.llm_config import SUB_AGENT_MODEL, sub_agent_llm_model
+from llm.llm_config import (
+    SUB_AGENT_MODEL,
+    SUB_AGENT_TEMPERATURE,
+    SUB_AGENT_TOP_P,
+    sub_agent_llm_model,
+)
 from question_solution.hungarian_algorithm import hungarian_maximum_assignment
 from models import SubTask
 from semantic_matcher import SemanticMatcher
@@ -241,6 +246,8 @@ class TextExtractionAgent(BaseAgent):
                     {"role": "system", "content": self._build_system_prompt()},
                     {"role": "user", "content": prompt},
                 ],
+                temperature=SUB_AGENT_TEMPERATURE,
+                top_p=SUB_AGENT_TOP_P,
             )
 
             result = response.choices[0].message.content
@@ -333,6 +340,8 @@ class BasicComputationAgent(BaseAgent):
                         "content": prompt,
                     },
                 ],
+                temperature=SUB_AGENT_TEMPERATURE,
+                top_p=SUB_AGENT_TOP_P,
             )
 
             parsed_info = response.usage.prompt_tokens  # 临时存储信息
@@ -375,6 +384,8 @@ class BasicComputationAgent(BaseAgent):
                         "content": prompt,
                     },
                 ],
+                temperature=SUB_AGENT_TEMPERATURE,
+                top_p=SUB_AGENT_TOP_P,
             )
 
             result = response.choices[0].message.content
@@ -468,6 +479,8 @@ class LogicalReasoningAgent(BaseAgent):
                         "content": prompt
                     },
                 ],
+                temperature=SUB_AGENT_TEMPERATURE,
+                top_p=SUB_AGENT_TOP_P,
             )
 
             state["intermediate_steps"].append(
@@ -506,7 +519,9 @@ class LogicalReasoningAgent(BaseAgent):
                         "role": "user",
                         "content": prompt,
                     },
-                ]
+                ],
+                temperature=SUB_AGENT_TEMPERATURE,
+                top_p=SUB_AGENT_TOP_P,
             )
 
             state["intermediate_steps"].append(
@@ -550,7 +565,9 @@ class LogicalReasoningAgent(BaseAgent):
                         "role": "user",
                         "content": prompt
                     },
-                ]
+                ],
+                temperature=SUB_AGENT_TEMPERATURE,
+                top_p=SUB_AGENT_TOP_P,
             )
 
             result = response.choices[0].message.content

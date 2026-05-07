@@ -4,6 +4,7 @@ import json
 import re
 import time
 
+from llm.llm_config import SINGLE_BASELINE_TEMPERATURE, SINGLE_BASELINE_TOP_P
 from services.result_parsing import strip_code_fence
 
 
@@ -33,6 +34,8 @@ def solve_with_single_llm(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ],
+        temperature=SINGLE_BASELINE_TEMPERATURE,
+        top_p=SINGLE_BASELINE_TOP_P,
     )
     end_time = time.time()
 

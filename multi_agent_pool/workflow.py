@@ -12,7 +12,12 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 from .actions import ActionRegistry, ActionType
-from llm.llm_config import SUB_AGENT_MODEL, sub_agent_llm_model
+from llm.llm_config import (
+    SUB_AGENT_MODEL,
+    SUB_AGENT_TEMPERATURE,
+    SUB_AGENT_TOP_P,
+    sub_agent_llm_model,
+)
 
 
 class AgentCategory(Enum):
@@ -90,6 +95,12 @@ class WorkflowManager:
         "websiteagent": ["visit_website", "extract_content"],
         "pythonagent": ["execute_python"],
     }
+
+    @staticmethod
+    def _safe_text(value: Any) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
 
     def __init__(
         self,
@@ -230,6 +241,8 @@ class WorkflowManager:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
+                temperature=SUB_AGENT_TEMPERATURE,
+                top_p=SUB_AGENT_TOP_P,
             )
             return {
                 "success": True,
@@ -618,7 +631,7 @@ class WorkflowManager:
                         normalized_url = self._normalize_url((chosen_input or {}).get("url", ""))
                         if not normalized_url:
                             response_content = (
-                                str(decision.get("final_answer", "") or "").strip()
+                                self._safe_text(decision.get("final_answer", ""))
                                 or "No valid URL found in task payload; skipped website access."
                             )
                             structured = self._normalize_structured_response(

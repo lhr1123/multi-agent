@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from multi_agent_pool.workflow import AgentCategory
 
+from llm.llm_config import TASK_ORCHESTRATOR_TEMPERATURE, TASK_ORCHESTRATOR_TOP_P
 from services.result_parsing import strip_code_fence
 
 
@@ -38,6 +39,8 @@ Dependency context:
                 {"role": "system", "content": "You generate safe Python code for subtask execution."},
                 {"role": "user", "content": prompt},
             ],
+            temperature=TASK_ORCHESTRATOR_TEMPERATURE,
+            top_p=TASK_ORCHESTRATOR_TOP_P,
         )
         code = strip_code_fence(response.choices[0].message.content or "")
         if code.strip():

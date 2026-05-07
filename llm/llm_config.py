@@ -36,6 +36,16 @@ def _env_with_fallback(primary: str, fallback: str, default: str = "") -> str:
     return default
 
 
+def _float_env_with_fallback(primary: str, fallback: str, default: float) -> float:
+    raw = _env_with_fallback(primary, fallback, "")
+    if raw == "":
+        return float(default)
+    try:
+        return float(raw)
+    except ValueError:
+        return float(default)
+
+
 # Shared fallback configuration.
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 SILICONFLOW_BASE_URL = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
@@ -62,18 +72,56 @@ SINGLE_BASELINE_BASE_URL = _env_with_fallback(
     "https://api.siliconflow.cn/v1",
 )
 
+# Shared fallback sampling configuration.
+LLM_TEMPERATURE = _float_env_with_fallback("LLM_TEMPERATURE", "", 0.0)
+LLM_TOP_P = _float_env_with_fallback("LLM_TOP_P", "", 1.0)
+
+# Role-specific sampling configuration.
+TASK_ORCHESTRATOR_TEMPERATURE = _float_env_with_fallback(
+    "TASK_ORCHESTRATOR_TEMPERATURE",
+    "LLM_TEMPERATURE",
+    LLM_TEMPERATURE,
+)
+TASK_ORCHESTRATOR_TOP_P = _float_env_with_fallback(
+    "TASK_ORCHESTRATOR_TOP_P",
+    "LLM_TOP_P",
+    LLM_TOP_P,
+)
+
+SUB_AGENT_TEMPERATURE = _float_env_with_fallback(
+    "SUB_AGENT_TEMPERATURE",
+    "LLM_TEMPERATURE",
+    LLM_TEMPERATURE,
+)
+SUB_AGENT_TOP_P = _float_env_with_fallback(
+    "SUB_AGENT_TOP_P",
+    "LLM_TOP_P",
+    LLM_TOP_P,
+)
+
+SINGLE_BASELINE_TEMPERATURE = _float_env_with_fallback(
+    "SINGLE_BASELINE_TEMPERATURE",
+    "LLM_TEMPERATURE",
+    LLM_TEMPERATURE,
+)
+SINGLE_BASELINE_TOP_P = _float_env_with_fallback(
+    "SINGLE_BASELINE_TOP_P",
+    "LLM_TOP_P",
+    LLM_TOP_P,
+)
+
 
 # Task orchestration layer model.
 # Responsible for task decomposition, dependency planning,
 # workflow coordination, and final answer extraction.
-TASK_ORCHESTRATOR_MODEL = "Qwen/Qwen3-VL-30B-A3B-Instruct"
+TASK_ORCHESTRATOR_MODEL = "Qwen3.6-35B-A3B"
 
 # Sub-agent execution model.
 # Responsible for subtask reasoning and deciding whether to use tools.
-SUB_AGENT_MODEL = "Qwen/Qwen3-VL-30B-A3B-Instruct"
+SUB_AGENT_MODEL = "llama3.1-8b"
 
 # Single-model baseline used in evaluation mode.
-SINGLE_BASELINE_MODEL = TASK_ORCHESTRATOR_MODEL
+SINGLE_BASELINE_MODEL = "llama3.1-8b"
 
 # Default fallback model when no explicit model is passed.
 DEFAULT_MODEL = TASK_ORCHESTRATOR_MODEL

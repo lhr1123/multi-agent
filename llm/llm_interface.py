@@ -10,7 +10,12 @@ from typing import Dict, Any, List
 import json
 import re
 
-from llm.llm_config import DEFAULT_MODEL, task_orchestrator_llm_model
+from llm.llm_config import (
+    DEFAULT_MODEL,
+    TASK_ORCHESTRATOR_TEMPERATURE,
+    TASK_ORCHESTRATOR_TOP_P,
+    task_orchestrator_llm_model,
+)
 
 
 class LLMInterface(ABC):
@@ -145,6 +150,8 @@ class SiliconFlowLLMInterface(LLMInterface):
                 {"role": "system", "content": "你是一个多智能体系统中的任务分解专家。"},
                 {"role": "user", "content": prompt},
             ],
+            temperature=TASK_ORCHESTRATOR_TEMPERATURE,
+            top_p=TASK_ORCHESTRATOR_TOP_P,
         )
         
         content = response.choices[0].message.content
