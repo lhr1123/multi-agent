@@ -119,6 +119,11 @@ def extract_best_number_from_sources(sources: List[Tuple[str, str, float]]) -> O
 
 
 def extract_prediction_from_multi_result(run_result: Dict[str, Any]) -> Optional[float]:
+    final_result = str(run_result.get("final_result", "") or "").strip()
+    direct_final = extract_last_number(final_result)
+    if direct_final is not None:
+        return direct_final
+
     sources: List[Tuple[str, str, float]] = []
 
     terminate_step = run_result.get("terminate_step", {}) or {}
@@ -142,9 +147,8 @@ def extract_prediction_from_multi_result(run_result: Dict[str, Any]) -> Optional
         if resp:
             sources.append(("terminate:response", resp, 2.6))
 
-    final_result = str(run_result.get("final_result", "") or "")
     if final_result:
-        sources.append(("final_result", final_result, 2.0))
+        sources.append(("final_result", final_result, 4.8))
 
     pred = extract_best_number_from_sources(sources)
     if pred is not None:
