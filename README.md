@@ -163,6 +163,33 @@ python main.py --mode dataset --benchmark mmlu-pro --dataset-path dataset/MMLU-P
 python main.py --mode dataset --benchmark mmlu-pro --dataset-path dataset/MMLU-Pro --dataset-limit 100 --save-path result/mmlu_pro_eval_output.json --compare-single
 ```
 
+### 断点续跑与并发评测
+
+长跑实验建议写 checkpoint，并把 multi-agent 与 single baseline 分开跑：
+
+```bash
+python main.py --mode dataset --benchmark mmlu-pro --dataset-path dataset/MMLU-Pro \
+  --dataset-offset 487 --run-kind multi --workers 4 \
+  --checkpoint-path result/runs/mmlu_multi_487.jsonl --resume \
+  --save-path result/mmlu_multi_487_summary.json --no-charts-during-run
+```
+
+baseline 可单独提高并发：
+
+```bash
+python main.py --mode dataset --benchmark mmlu-pro --dataset-path dataset/MMLU-Pro \
+  --dataset-offset 487 --run-kind single --workers 8 \
+  --checkpoint-path result/runs/mmlu_single_487.jsonl --resume \
+  --save-path result/mmlu_single_487_summary.json --no-charts-during-run
+```
+
+合并多个 shard / checkpoint：
+
+```bash
+python -m evaluation.merge_checkpoints --benchmark mmlu-pro --dataset-path dataset/MMLU-Pro \
+  --save-path result/mmlu_pro_merged.json result/runs/mmlu_multi_*.jsonl
+```
+
 ## Outputs
 
 评测模式会在 `result/` 下产出：

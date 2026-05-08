@@ -83,6 +83,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="Also run single-LLM baseline on the same benchmark samples.",
     )
     parser.add_argument(
+        "--run-kind",
+        type=str,
+        default="multi",
+        choices=["multi", "single", "both"],
+        help="Dataset run side: multi=multi-agent only, single=baseline only, both=run both. Old --compare-single behavior is preserved.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of dataset samples to evaluate concurrently. Default 1 preserves old serial behavior.",
+    )
+    parser.add_argument(
+        "--checkpoint-path",
+        type=str,
+        default=None,
+        help="Append one JSONL record per completed dataset sample for crash-safe resume.",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Read --checkpoint-path and skip already completed sample ids.",
+    )
+    parser.add_argument(
+        "--no-charts-during-run",
+        action="store_true",
+        help="Skip chart generation for shard/checkpoint runs; generate charts during merge instead.",
+    )
+    parser.add_argument(
         "--verbose-eval",
         action="store_true",
         help="Print full per-sample execution logs during dataset evaluation.",
@@ -120,8 +149,13 @@ def main() -> None:
                 offset=args.dataset_offset,
                 save_path=save_path,
                 compare_single_baseline=args.compare_single,
-                single_llm=single_llm if args.compare_single else None,
+                single_llm=single_llm if args.compare_single or args.run_kind in {"single", "both"} else None,
                 quiet_per_sample=not args.verbose_eval,
+                run_kind=args.run_kind,
+                workers=max(1, args.workers),
+                checkpoint_path=args.checkpoint_path,
+                resume=args.resume,
+                charts_during_run=not args.no_charts_during_run,
             )
         else:
             evaluate_multi_agent_on_gsmhard(
@@ -132,8 +166,13 @@ def main() -> None:
                 offset=args.dataset_offset,
                 save_path=save_path,
                 compare_single_baseline=args.compare_single,
-                single_llm=single_llm if args.compare_single else None,
+                single_llm=single_llm if args.compare_single or args.run_kind in {"single", "both"} else None,
                 quiet_per_sample=not args.verbose_eval,
+                run_kind=args.run_kind,
+                workers=max(1, args.workers),
+                checkpoint_path=args.checkpoint_path,
+                resume=args.resume,
+                charts_during_run=not args.no_charts_during_run,
             )
         return
 

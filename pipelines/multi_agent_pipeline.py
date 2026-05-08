@@ -27,6 +27,7 @@ def run_multi_agent_flow(
     task_description: str,
     sub_agent_model_name: str = SUB_AGENT_MODEL,
     final_summary_instruction: str = "",
+    semantic_matcher: SemanticMatcher = None,
 ) -> Dict[str, Any]:
     print("多智能体任务分配系统")
     print("=" * 60)
@@ -55,7 +56,7 @@ def run_multi_agent_flow(
     for agent in all_agents:
         print(f"  - {agent.agent_id}: {agent.agent_name} ({agent.category.value})")
 
-    semantic_matcher = SemanticMatcher()
+    semantic_matcher = semantic_matcher or SemanticMatcher()
     score_matrix = build_score_matrix(decomposition_result.sub_tasks, all_agents, semantic_matcher)
     print("\n得分矩阵:")
     for i, row in enumerate(score_matrix):
