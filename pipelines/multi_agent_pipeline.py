@@ -10,7 +10,7 @@ from question_solution.task_decomposer import TaskDecomposer
 from reporters.console_reporter import print_decomposition_result, print_final_result
 from semantic_matcher import SemanticMatcher
 from services.action_selection import select_action_and_input
-from services.assignment_service import assign_subtasks_with_hungarian_core, build_score_matrix
+from services.assignment_service import assign_subtasks_with_hungarian_core, build_score_matrix, infer_routing_context
 from services.result_parsing import extract_workflow_step_result, safe_json_loads_from_text
 from utils.dependency_utils import sanitize_subtask_dependencies
 
@@ -52,12 +52,20 @@ def run_multi_agent_flow(
     tool_agents = workflow_manager.get_tool_agents()
     reasoning_agents = workflow_manager.get_reasoning_agents()
     all_agents = tool_agents + reasoning_agents
+    routing_context = infer_routing_context(task_title=task_title, task_description=task_description)
+    print(f"路由上下文: {routing_context}")
     print(f"可用智能体数量: {len(all_agents)}")
     for agent in all_agents:
         print(f"  - {agent.agent_id}: {agent.agent_name} ({agent.category.value})")
 
     semantic_matcher = semantic_matcher or SemanticMatcher()
-    score_matrix = build_score_matrix(decomposition_result.sub_tasks, all_agents, semantic_matcher)
+    score_matrix = build_score_matrix(
+        decomposition_result.sub_tasks,
+        all_agents,
+        semantic_matcher,
+        task_title=task_title,
+        task_description=task_description,
+    )
     print("\n得分矩阵:")
     for i, row in enumerate(score_matrix):
         print(f"  {decomposition_result.sub_tasks[i].title[:20]}... -> {row}")
