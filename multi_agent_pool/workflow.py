@@ -218,8 +218,9 @@ class WorkflowManager:
                 f"Summary:\n{summary}\n\n"
                 "Task:\n"
                 "1) Read all evidence and extract the true final answer.\n"
-                "2) If evidence conflicts, choose the most self-consistent answer and explain briefly.\n"
-                "3) For math problems, final_answer should be the final numeric value only.\n\n"
+                "2) Use the last calculation step's final answer when it is consistent with the evidence.\n"
+                "3) Put only the final answer value in final_answer. Do not put reasoning, step numbers, confidence, or intermediate values in final_answer.\n"
+                "4) If evidence conflicts, explain briefly in result_text, not in final_answer.\n\n"
                 "Return strict JSON only:\n"
                 "{\n"
                 '  "status": "ok|partial|failed",\n'

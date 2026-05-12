@@ -33,6 +33,20 @@ def extract_first_number(text: str) -> Optional[float]:
         return None
 
 
+def extract_strict_number(text: str) -> Optional[float]:
+    if text is None:
+        return None
+    s = str(text).strip()
+    match = re.fullmatch(r"[\s`'\"\(\[]*(-?\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?)[\s`'\"\)\].,]*", s)
+    if not match:
+        return None
+    raw = match.group(1).replace(",", "")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
 def _coerce_number(value: Any) -> Optional[float]:
     if value is None:
         return None
@@ -40,7 +54,7 @@ def _coerce_number(value: Any) -> Optional[float]:
         return None
     if isinstance(value, (int, float)):
         return float(value)
-    return extract_first_number(str(value))
+    return extract_strict_number(str(value))
 
 
 def extract_number_from_final_answer_field(text: str) -> Optional[float]:
@@ -56,10 +70,14 @@ def extract_number_from_final_answer_field(text: str) -> Optional[float]:
         rf"\banswer\b\s*[:：=]\s*[\(\[`'\"]*\s*({number})",
         rf"答案\s*[:：=]\s*[\(\[`'\"]*\s*({number})",
     ]
+    candidates = []
     for pattern in patterns:
-        match = re.search(pattern, s, flags=re.IGNORECASE)
-        if not match:
+        matches = list(re.finditer(pattern, s, flags=re.IGNORECASE))
+        if not matches:
             continue
+        candidates.extend(matches)
+    candidates.sort(key=lambda match: match.start())
+    for match in reversed(candidates):
         raw = match.group(1).replace(",", "")
         try:
             return float(raw)

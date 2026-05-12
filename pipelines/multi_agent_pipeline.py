@@ -21,6 +21,15 @@ def _safe_text(value: Any) -> str:
     return str(value).strip()
 
 
+def _looks_like_direct_final_answer(value: Any) -> bool:
+    text = _safe_text(value)
+    if not text:
+        return False
+    if "\n" in text or len(text) > 80:
+        return False
+    return True
+
+
 def run_multi_agent_flow(
     llm,
     task_title: str,
@@ -211,7 +220,8 @@ def run_multi_agent_flow(
             "Use the final answer from the last calculation step when it is available. "
             "Return strict JSON with status/final_answer/result_text/key_facts/confidence. "
             "final_answer must contain only the final answer value (number or short text) with no extra narration. "
-            "Do not place confidence scores, step numbers, or intermediate values in final_answer."
+            "Do not place confidence scores, step numbers, or intermediate values in final_answer. "
+            "Your response must be parseable JSON only; do not include analysis text before or after JSON."
         )
         aggregate_payload = {
             "original_task": task_description,
@@ -238,11 +248,12 @@ def run_multi_agent_flow(
             terminate_structured = {}
 
         candidate = _safe_text(terminate_structured.get("final_answer", ""))
-        if candidate:
+        if candidate and _looks_like_direct_final_answer(candidate):
             final_result = candidate
         elif terminate_response:
             parsed = safe_json_loads_from_text(terminate_response)
-            final_result = _safe_text(parsed.get("final_answer", "") or terminate_response)
+            parsed_candidate = _safe_text(parsed.get("final_answer", "") if parsed else "")
+            final_result = parsed_candidate if _looks_like_direct_final_answer(parsed_candidate) else terminate_response
 
     if not final_result:
         final_result = merged_result
