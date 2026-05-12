@@ -19,6 +19,55 @@ def extract_last_number(text: str) -> Optional[float]:
         return None
 
 
+def extract_first_number(text: str) -> Optional[float]:
+    if text is None:
+        return None
+    s = str(text)
+    match = re.search(r"-?\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?", s)
+    if not match:
+        return None
+    raw = match.group(0).replace(",", "")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _coerce_number(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return extract_first_number(str(value))
+
+
+def extract_number_from_final_answer_field(text: str) -> Optional[float]:
+    """Extract a number explicitly attached to a final-answer label."""
+    if text is None:
+        return None
+    s = str(text)
+    number = r"-?\d+(?:,\d{3})*(?:\.\d+)?(?:[eE][+-]?\d+)?"
+    patterns = [
+        rf'"final_answer"\s*:\s*"?\s*({number})',
+        rf"'final_answer'\s*:\s*'?\s*({number})",
+        rf"\bfinal[_\s-]*answer\b\s*[:：=]\s*[\(\[`'\"]*\s*({number})",
+        rf"\banswer\b\s*[:：=]\s*[\(\[`'\"]*\s*({number})",
+        rf"答案\s*[:：=]\s*[\(\[`'\"]*\s*({number})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, s, flags=re.IGNORECASE)
+        if not match:
+            continue
+        raw = match.group(1).replace(",", "")
+        try:
+            return float(raw)
+        except ValueError:
+            continue
+    return None
+
+
 def is_correct_prediction(pred: Optional[float], target: Optional[float], tol: float = 1e-6) -> bool:
     if pred is None or target is None:
         return False
@@ -120,9 +169,6 @@ def extract_best_number_from_sources(sources: List[Tuple[str, str, float]]) -> O
 
 def extract_prediction_from_multi_result(run_result: Dict[str, Any]) -> Optional[float]:
     final_result = str(run_result.get("final_result", "") or "").strip()
-    direct_final = extract_last_number(final_result)
-    if direct_final is not None:
-        return direct_final
 
     sources: List[Tuple[str, str, float]] = []
 
@@ -130,7 +176,11 @@ def extract_prediction_from_multi_result(run_result: Dict[str, Any]) -> Optional
     if isinstance(terminate_step, dict):
         terminate_structured = terminate_step.get("structured_response", {}) or {}
         if isinstance(terminate_structured, dict):
-            fa = str(terminate_structured.get("final_answer", "") or "")
+            fa_raw = terminate_structured.get("final_answer", "")
+            direct = _coerce_number(fa_raw)
+            if direct is not None:
+                return direct
+            fa = str(fa_raw or "")
             rt = str(terminate_structured.get("result_text", "") or "")
             conf = terminate_structured.get("confidence", 0.7)
             try:
@@ -145,9 +195,15 @@ def extract_prediction_from_multi_result(run_result: Dict[str, Any]) -> Optional
                 sources.append(("terminate:result_text", rt, base * 0.8))
         resp = str(terminate_step.get("response", "") or "")
         if resp:
+            direct = extract_number_from_final_answer_field(resp)
+            if direct is not None:
+                return direct
             sources.append(("terminate:response", resp, 2.6))
 
     if final_result:
+        direct = extract_number_from_final_answer_field(final_result)
+        if direct is not None:
+            return direct
         sources.append(("final_result", final_result, 4.8))
 
     pred = extract_best_number_from_sources(sources)

@@ -208,8 +208,10 @@ def run_multi_agent_flow(
         summary_instruction = final_summary_instruction or (
             "You are responsible for final answer extraction. "
             "For math word problems, compute and provide the final numeric answer. "
+            "Use the final answer from the last calculation step when it is available. "
             "Return strict JSON with status/final_answer/result_text/key_facts/confidence. "
-            "final_answer must contain only the final answer value (number or short text) with no extra narration."
+            "final_answer must contain only the final answer value (number or short text) with no extra narration. "
+            "Do not place confidence scores, step numbers, or intermediate values in final_answer."
         )
         aggregate_payload = {
             "original_task": task_description,

@@ -22,6 +22,9 @@ Requirements:
 2. Put final value in variable `result`.
 3. Print the final value.
 4. Return code only.
+5. Follow the numbers in the task literally, even if they are unrealistic.
+6. Do not clamp negative values to zero, do not use abs/max/min to make values realistic, and do not add common-sense corrections unless the task explicitly asks for them.
+7. Do not round or cast to int unless the task explicitly requests rounding or an integer count.
 
 Original task:
 {original_task_description}
