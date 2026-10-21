@@ -10,12 +10,14 @@ import re
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from services.usage_tracker import tracked_completion, current_tracker, BudgetExceeded, DeadlineExceeded
 
 from .actions import ActionRegistry, ActionType
 from llm.llm_config import (
     SUB_AGENT_MODEL,
     SUB_AGENT_TEMPERATURE,
     SUB_AGENT_TOP_P,
+    SILICONFLOW_EXTRA_BODY,
     sub_agent_llm_model,
 )
 
@@ -115,6 +117,7 @@ class WorkflowManager:
         self.agent_personas: Dict[str, AgentPersona] = {}
         self.action_registry = ActionRegistry()
         self.current_workflow: Optional[Workflow] = None
+        self.call_stage = "reasoning"
 
         self._load_personas()
 
@@ -236,7 +239,7 @@ class WorkflowManager:
 
     def _call_llm(self, system_prompt: str, user_prompt: str) -> Dict[str, Any]:
         try:
-            response = self.client.chat.completions.create(
+            response = tracked_completion(self.client, stage=self.call_stage,
                 model=self.model_name,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -244,6 +247,7 @@ class WorkflowManager:
                 ],
                 temperature=SUB_AGENT_TEMPERATURE,
                 top_p=SUB_AGENT_TOP_P,
+                extra_body=SILICONFLOW_EXTRA_BODY,
             )
             return {
                 "success": True,
@@ -254,7 +258,10 @@ class WorkflowManager:
                     "total_tokens": response.usage.total_tokens if response.usage else 0,
                 },
             }
+        except (BudgetExceeded, DeadlineExceeded):
+            raise
         except Exception as e:
+            self.last_call_error = type(e).__name__
             return {"success": False, "error": str(e), "content": "", "token_usage": {}}
 
     def _safe_json_loads(self, content: str) -> Optional[Dict[str, Any]]:
@@ -297,7 +304,7 @@ class WorkflowManager:
             text = (fallback_text or raw_content or "").strip()
             return {
                 "status": fallback_status,
-                "final_answer": text,
+                "final_answer": "",
                 "result_text": text,
                 "key_facts": [],
                 "confidence": 0.5,
@@ -317,8 +324,6 @@ class WorkflowManager:
             confidence = 0.5
         confidence = max(0.0, min(1.0, confidence))
 
-        if not final_answer and result_text:
-            final_answer = result_text
         if not result_text and final_answer:
             result_text = final_answer
 
@@ -391,22 +396,9 @@ class WorkflowManager:
             }
 
         decision = self._safe_json_loads(llm_result.get("content", ""))
-        if decision is None:
-            # Fallback: still let agent use planned action.
-            fallback_use_tool = True
-            if step.agent_id == "websiteagent":
-                if not self._normalize_url((step.input_data or {}).get("url", "")):
-                    fallback_use_tool = False
-            decision = {
-                "use_tool": fallback_use_tool,
-                "chosen_action": step.action_id,
-                "tool_input": step.input_data,
-                "final_answer": llm_result.get("content", ""),
-                "reason": "Decision JSON parse failed, fallback to planned action.",
-            }
-
-        if "use_tool" not in decision:
-            decision["use_tool"] = True
+        if decision is None or not isinstance(decision.get("use_tool"), bool):
+            return {"ok": False, "error": "Tool decision requires JSON with boolean use_tool",
+                    "tokens": llm_result.get("token_usage", {})}
         if decision.get("use_tool") and not decision.get("chosen_action"):
             decision["chosen_action"] = step.action_id
         if decision.get("use_tool") and not isinstance(decision.get("tool_input"), dict):
@@ -441,10 +433,15 @@ class WorkflowManager:
 
     def _execute_tool_action(self, action_id: str, input_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Execute supported tool actions directly. Return None for LLM fallback."""
+        tracker = current_tracker()
+        if tracker:
+            tracker.check()
+        remaining = tracker.remaining_seconds() if tracker else 30
+        timeout = max(0.001, min(float(input_data.get("timeout", 30)), remaining))
         if action_id == "execute_python":
-            from utils.utils import execute_python_code
+            from services.code_execution import execute_python
 
-            result = execute_python_code(input_data.get("code", ""))
+            result = execute_python(input_data.get("code", ""), timeout=timeout)
             if result.get("success"):
                 output = result.get("output") or ""
                 return_value = result.get("return_value") or ""
@@ -488,7 +485,6 @@ class WorkflowManager:
             url = self._normalize_url(input_data.get("url", ""))
             if not url:
                 return {"success": False, "content": "Invalid or missing URL for visit_website."}
-            timeout = int(input_data.get("timeout", 30))
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 html = resp.read().decode("utf-8", errors="ignore")
@@ -498,7 +494,6 @@ class WorkflowManager:
             url = self._normalize_url(input_data.get("url", ""))
             if not url:
                 return {"success": False, "content": "Invalid or missing URL for extract_content."}
-            timeout = int(input_data.get("timeout", 30))
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 html = resp.read().decode("utf-8", errors="ignore")
@@ -516,7 +511,7 @@ class WorkflowManager:
                 "http://export.arxiv.org/api/query?"
                 f"search_query=all:{encoded}&start=0&max_results={max_results}"
             )
-            with urllib.request.urlopen(url, timeout=20) as resp:
+            with urllib.request.urlopen(url, timeout=min(20, timeout)) as resp:
                 xml_content = resp.read().decode("utf-8", errors="ignore")
 
             root = ET.fromstring(xml_content)
@@ -543,7 +538,7 @@ class WorkflowManager:
                     }
                 )
             )
-            with urllib.request.urlopen(url, timeout=20) as resp:
+            with urllib.request.urlopen(url, timeout=min(20, timeout)) as resp:
                 payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
 
             lines = []
@@ -569,10 +564,33 @@ class WorkflowManager:
         return None
 
     def execute_workflow(self) -> Dict[str, Any]:
+        self.last_call_error = ""
+        result = self._execute_workflow()
+        succeeded = bool(result.get("results"))
+        for step in result.get("results", {}).values():
+            structured = step.get("structured_response") or {}
+            passed = (not step.get("error") and structured.get("status") in {"ok", "success", "completed"}
+                      and bool(structured.get("result_text") or structured.get("final_answer")))
+            step["verification"] = {"passed": passed, "kind": "format_and_execution",
+                                    "semantic_correctness_checked": False}
+            step["success"] = passed
+            succeeded = succeeded and passed
+        result["success"] = succeeded
+        result["failure_kind"] = "" if succeeded else (
+            "transport" if self.last_call_error in {"TimeoutError", "APITimeoutError", "APIConnectionError", "RateLimitError", "InternalServerError"}
+            else "capability"
+        )
+        result["retryable"] = not getattr(self, "side_effect_attempted", False)
+        if self.current_workflow:
+            self.current_workflow.status = WorkflowStatus.COMPLETED if succeeded else WorkflowStatus.FAILED
+        return result
+
+    def _execute_workflow(self) -> Dict[str, Any]:
         if not self.current_workflow:
             return {"error": "No active workflow"}
 
         self.current_workflow.status = WorkflowStatus.RUNNING
+        self.side_effect_attempted = False
         results: Dict[str, Any] = {}
         total_tokens = 0
 
@@ -602,6 +620,7 @@ class WorkflowManager:
             }
 
             if is_tool_action:
+                self.call_stage = "tool_decision"
                 # Tool usage should be decided by the assigned sub-agent (LLM), not hard-executed.
                 decision_result = self._agent_decide_tool_call(agent, step)
                 if not decision_result.get("ok"):
@@ -671,7 +690,11 @@ class WorkflowManager:
                         continue
 
                     try:
+                        if chosen_action in {"write_file", "delete_file"}:
+                            self.side_effect_attempted = True
                         tool_result = self._execute_tool_action(chosen_action, chosen_input)
+                    except (BudgetExceeded, DeadlineExceeded):
+                        raise
                     except Exception as e:
                         tool_result = {"success": False, "content": str(e)}
 
@@ -687,6 +710,7 @@ class WorkflowManager:
                         results[step.step_id] = {"error": step.error}
                         continue
 
+                    self.call_stage = "tool_summary"
                     summarize = self._agent_summarize_tool_output(
                         agent=agent,
                         action_id=chosen_action,
@@ -787,6 +811,12 @@ class WorkflowManager:
                 f"You are {agent.agent_name}.",
             )
             user_prompt = self._build_action_prompt(step.action_id, step.input_data)
+            self.call_stage = "final" if step.action_id == "terminate_task" else "reasoning"
+            system_prompt += (
+                '\nReturn JSON only with status (ok, partial, failed), final_answer, result_text, '
+                'key_facts (a list), and confidence. Use ok only when the assigned subtask is complete. '
+                'Keep essential equations, evidence and units in result_text; report unresolved issues as partial.'
+            )
             llm_result = self._call_llm(system_prompt, user_prompt)
             if llm_result.get("success"):
                 step.llm_response = llm_result["content"]

@@ -8,12 +8,14 @@ LLM接口抽象类与默认实现
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 import json
+from services.usage_tracker import tracked_completion
 import re
 
 from llm.llm_config import (
     DEFAULT_MODEL,
     TASK_ORCHESTRATOR_TEMPERATURE,
     TASK_ORCHESTRATOR_TOP_P,
+    SILICONFLOW_EXTRA_BODY,
     task_orchestrator_llm_model,
 )
 
@@ -23,7 +25,8 @@ class LLMInterface(ABC):
     
     @abstractmethod
     def decompose_task(self, task_title: str, task_description: str,
-                      task_priority: str) -> Dict[str, Any]:
+                      task_priority: str, max_subtasks: int = 3,
+                      allow_direct: bool = True) -> Dict[str, Any]:
         """
         调用LLM进行任务分解
         
@@ -77,7 +80,8 @@ class MockLLMInterface(LLMInterface):
     """
     
     def decompose_task(self, task_title: str, task_description: str,
-                      task_priority: str) -> Dict[str, Any]:
+                      task_priority: str, max_subtasks: int = 3,
+                      allow_direct: bool = True) -> Dict[str, Any]:
         """Mock实现，返回示例分解结果"""
         return {
             "sub_tasks": [
@@ -136,15 +140,16 @@ class SiliconFlowLLMInterface(LLMInterface):
         self.model_name = model_name or DEFAULT_MODEL
     
     def decompose_task(self, task_title: str, task_description: str,
-                      task_priority: str) -> Dict[str, Any]:
+                      task_priority: str, max_subtasks: int = 3,
+                      allow_direct: bool = True) -> Dict[str, Any]:
         """
         调用真实LLM进行任务分解
         """
         prompt = self._build_decomposition_prompt(
-            task_title, task_description, task_priority
+            task_title, task_description, task_priority, max_subtasks, allow_direct
         )
         
-        response = self.client.chat.completions.create(
+        response = tracked_completion(self.client, stage="decomposition",
             model=self.model_name,
             messages=[
                 {"role": "system", "content": "你是一个多智能体系统中的任务分解专家。"},
@@ -152,6 +157,7 @@ class SiliconFlowLLMInterface(LLMInterface):
             ],
             temperature=TASK_ORCHESTRATOR_TEMPERATURE,
             top_p=TASK_ORCHESTRATOR_TOP_P,
+            extra_body=SILICONFLOW_EXTRA_BODY,
         )
         
         content = response.choices[0].message.content
@@ -173,9 +179,14 @@ class SiliconFlowLLMInterface(LLMInterface):
         return []
     
     def _build_decomposition_prompt(self, title: str, description: str,
-                                   priority: str) -> str:
+                                   priority: str, max_subtasks: int = 3,
+                                   allow_direct: bool = True) -> str:
         """构建任务分解prompt"""
-        prompt = f"""请将以下任务分解为多个子任务。使用中文回答
+        direct_rule = (
+            "如果一个智能体可以独立完成，必须选择 DIRECT，并只返回一个子任务。"
+            if allow_direct else "必须选择 DECOMPOSE。"
+        )
+        prompt = f"""你是通用多智能体系统的最小规划器。使用中文回答。
 
 任务标题：{title}
 任务描述：{description}
@@ -183,6 +194,7 @@ class SiliconFlowLLMInterface(LLMInterface):
 
 请按照以下JSON格式返回分解结果：
 {{
+    "mode": "DIRECT或DECOMPOSE",
     "sub_tasks": [
         {{
             "title": "子任务标题",
@@ -191,7 +203,7 @@ class SiliconFlowLLMInterface(LLMInterface):
             "estimated_time": 2.0,
             "required_skills": ["技能1", "技能2"],
             "dependencies": [],
-            "metadata": {{}}
+            "metadata": {{"work_type": "solve|calculate|criticize|repair|summarize", "required": true}}
         }}
     ],
     "decomposition_strategy": "分解策略说明",
@@ -199,11 +211,13 @@ class SiliconFlowLLMInterface(LLMInterface):
 }}
 
 要求：
-1. 子任务应该具体、可执行
-2. dependencies字段使用子任务在数组中的索引（从0开始）
-3. 合理设置优先级和预计时间
-4. 识别所需的技能
-5. 确保依赖关系合理（无循环依赖）
+1. {direct_rule}
+2. 最多返回 {max_subtasks} 个子任务；只有确实需要不同能力或依赖步骤时才选择 DECOMPOSE
+3. 每个子任务应该具体、可执行；不要创建“最终汇总/给出答案”子任务，系统会统一收束
+4. dependencies字段使用子任务在数组中的索引（从0开始），确保无循环依赖
+5. required=true 仅用于得到答案必不可少的工作；额外复核可设为 false
+6. 子任务描述必须保留关键数字、约束和输出格式，不能假设智能体看过规划过程
+7. 识别所需技能，并设置 work_type
 
 请直接返回JSON，不要包含其他文字。"""
         return prompt
@@ -253,6 +267,11 @@ class SiliconFlowLLMInterface(LLMInterface):
             raise ValueError("sub_tasks必须是列表类型")
         if len(response["sub_tasks"]) == 0:
             raise ValueError("sub_tasks不能为空")
+
+        mode = str(response.get("mode", "DECOMPOSE")).upper()
+        if mode not in {"DIRECT", "DECOMPOSE"}:
+            mode = "DECOMPOSE"
+        response["mode"] = mode
         
         for i, sub_task in enumerate(response["sub_tasks"]):
             if "title" not in sub_task:

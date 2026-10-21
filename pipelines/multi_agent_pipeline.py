@@ -1,273 +1,229 @@
-"""Multi-agent orchestration pipeline."""
+"""Fixed-DAG multi-agent execution with static or rolling assignment."""
 
 import json
-from typing import Any, Dict
+from dataclasses import asdict
 
 from llm.llm_config import SUB_AGENT_MODEL
-from models import TaskPriority
+from models import SchedulerConfig, TaskPriority
 from multi_agent_pool.workflow import WorkflowManager
 from question_solution.task_decomposer import TaskDecomposer
-from reporters.console_reporter import print_decomposition_result, print_final_result
 from semantic_matcher import SemanticMatcher
 from services.action_selection import select_action_and_input
-from services.assignment_service import assign_subtasks_with_hungarian_core, build_score_matrix, infer_routing_context
-from services.result_parsing import extract_workflow_step_result, safe_json_loads_from_text
-from utils.dependency_utils import sanitize_subtask_dependencies
+from services.assignment_service import build_score_matrix
+from services.decomposition_cache import DecompositionCache, plan_cache_key
+from services.evidence_store import EvidenceStore
+from services.execution_controller import ExecutionController
+from services.failure_classification import classify_failure
+from services.result_parsing import extract_workflow_step_result
+from services.usage_tracker import UsageTracker, usage_scope, BudgetExceeded, DeadlineExceeded
 
 
-def _safe_text(value: Any) -> str:
-    if value is None:
-        return ""
-    return str(value).strip()
+def _validate_dag(tasks):
+    by_id = {t.id: t for t in tasks}
+    if len(by_id) != len(tasks):
+        raise ValueError("Duplicate task IDs")
+    visiting, done = set(), set()
+
+    def visit(task_id):
+        if task_id not in by_id:
+            raise ValueError(f"Unknown dependency: {task_id}")
+        if task_id in visiting:
+            raise ValueError("Cyclic task dependencies")
+        if task_id in done:
+            return
+        visiting.add(task_id)
+        for dependency in by_id[task_id].dependencies:
+            visit(dependency)
+        visiting.remove(task_id)
+        done.add(task_id)
+
+    for task in tasks:
+        visit(task.id)
 
 
-def _looks_like_direct_final_answer(value: Any) -> bool:
-    text = _safe_text(value)
-    if not text:
-        return False
-    if "\n" in text or len(text) > 80:
-        return False
-    return True
+def _feasibility(tasks, agents, config):
+    unknown = set(config.capacities) - {a.agent_id for a in agents}
+    if unknown:
+        raise ValueError(f"Unknown capacity agent IDs: {sorted(unknown)}")
+    matrix = []
+    for task in tasks:
+        allowed = task.metadata.get("allowed_agent_ids")
+        required = set(task.metadata.get("required_capabilities", []))
+        matrix.append([
+            (allowed is None or agent.agent_id in allowed)
+            and required.issubset(set(agent.capabilities))
+            and config.capacities.get(agent.agent_id, config.max_parallel) > 0
+            for agent in agents
+        ])
+    return matrix
 
 
 def run_multi_agent_flow(
-    llm,
-    task_title: str,
-    task_description: str,
-    sub_agent_model_name: str = SUB_AGENT_MODEL,
-    final_summary_instruction: str = "",
-    semantic_matcher: SemanticMatcher = None,
-) -> Dict[str, Any]:
-    print("多智能体任务分配系统")
-    print("=" * 60)
-
-    print("\n【步骤1】任务分解")
-    print("-" * 60)
-    decomposer = TaskDecomposer(llm_interface=llm)
-    task = decomposer.create_task(title=task_title, description=task_description, priority=TaskPriority.HIGH)
-    decomposition_result = decomposer.decompose(task)
-    dep_fix_stats = sanitize_subtask_dependencies(decomposition_result.sub_tasks)
-    if dep_fix_stats["removed_invalid"] or dep_fix_stats["removed_cycle_edges"]:
-        print(
-            "Dependency graph normalized: "
-            f"removed_invalid={dep_fix_stats['removed_invalid']}, "
-            f"removed_cycle_edges={dep_fix_stats['removed_cycle_edges']}"
-        )
-    print_decomposition_result(decomposition_result)
-
-    print("\n【步骤2】Embedding + 匈牙利分配")
-    print("-" * 60)
-    workflow_manager = WorkflowManager(model_name=sub_agent_model_name)
-    tool_agents = workflow_manager.get_tool_agents()
-    reasoning_agents = workflow_manager.get_reasoning_agents()
-    all_agents = tool_agents + reasoning_agents
-    routing_context = infer_routing_context(task_title=task_title, task_description=task_description)
-    print(f"路由上下文: {routing_context}")
-    print(f"可用智能体数量: {len(all_agents)}")
-    for agent in all_agents:
-        print(f"  - {agent.agent_id}: {agent.agent_name} ({agent.category.value})")
-
-    semantic_matcher = semantic_matcher or SemanticMatcher()
-    score_matrix = build_score_matrix(
-        decomposition_result.sub_tasks,
-        all_agents,
-        semantic_matcher,
-        task_title=task_title,
-        task_description=task_description,
-    )
-    print("\n得分矩阵:")
-    for i, row in enumerate(score_matrix):
-        print(f"  {decomposition_result.sub_tasks[i].title[:20]}... -> {row}")
-
-    assignments, total_score, assignment_meta = assign_subtasks_with_hungarian_core(
-        score_matrix=score_matrix,
-        n_agents=len(all_agents),
-    )
-    print(
-        f"Hungarian-core assignment config: "
-        f"slots_per_agent={assignment_meta.get('slots_per_agent', 0)}, "
-        f"expanded_agents={assignment_meta.get('expanded_agents', 0)}"
-    )
-    print(f"\n匹配结果 (总分: {total_score}):")
-
-    matched_by_id: Dict[str, Dict[str, Any]] = {}
-    for i, subtask in enumerate(decomposition_result.sub_tasks):
-        agent_idx = assignments[i] if i < len(assignments) else -1
-        if agent_idx < 0 or agent_idx >= len(all_agents):
-            if all_agents:
-                retry_assignments, _, _ = assign_subtasks_with_hungarian_core(
-                    score_matrix=[score_matrix[i]],
-                    n_agents=len(all_agents),
-                    slots_per_agent=1,
-                )
-                agent_idx = retry_assignments[0] if retry_assignments else -1
-                if agent_idx < 0 or agent_idx >= len(all_agents):
-                    print(f"  Subtask[{i}] {subtask.title} -> Hungarian fallback failed")
-                    continue
-                print(f"  子任务[{i}] {subtask.title} -> 未分配，回退到最高分智能体 {all_agents[agent_idx].agent_id}")
-            else:
-                print(f"  子任务[{i}] {subtask.title} -> 无可用智能体")
-                continue
-        agent = all_agents[agent_idx]
-        print(f"  子任务[{i}] {subtask.title} -> {agent.agent_id} ({agent.agent_name})")
-        matched_by_id[subtask.id] = {"subtask": subtask, "agent": agent, "score": score_matrix[i][agent_idx]}
-
-    print("\n【步骤3】按依赖关系执行")
-    print("-" * 60)
-
-    subtask_map = {subtask.id: subtask for subtask in decomposition_result.sub_tasks}
-    executed = set()
-    executing = set()
-    step_outputs: Dict[str, str] = {}
-    step_structured: Dict[str, Dict[str, Any]] = {}
-    total_tokens = 0
-
-    def execute_step(subtask_id: str) -> None:
-        nonlocal total_tokens
-        if subtask_id in executed:
-            return
-        if subtask_id in executing:
-            print(f"Warning: dependency cycle hit at {subtask_id}, skipping recursive edge.")
-            return
-        if subtask_id not in matched_by_id:
-            print(f"  跳过未分配任务: {subtask_id}")
-            executed.add(subtask_id)
-            return
-
-        executing.add(subtask_id)
-        subtask = subtask_map[subtask_id]
-        agent = matched_by_id[subtask_id]["agent"]
-
-        for dependency_id in subtask.dependencies:
-            execute_step(dependency_id)
-
-        print(f"\n执行子任务: {subtask.title}")
-        print(f"  分配智能体: {agent.agent_name}")
-        print(f"  所需技能: {subtask.required_skills}")
-
-        action_id, input_data = select_action_and_input(
-            llm=llm,
-            subtask=subtask,
-            agent=agent,
-            original_task_description=task_description,
-            step_outputs=step_outputs,
-        )
-
-        workflow_manager.create_workflow(f"step_{subtask.id}", subtask.description)
-        workflow_manager.add_step(agent.agent_id, action_id, input_data)
-        workflow_result = workflow_manager.execute_workflow()
-
-        total_tokens += workflow_result.get("total_tokens", 0)
-        step_result = extract_workflow_step_result(workflow_result)
-        response = _safe_text(step_result.get("response", ""))
-        structured = step_result.get("structured_response")
-        if not isinstance(structured, dict) or not structured:
-            parsed = safe_json_loads_from_text(response)
-            structured = {
-                "status": "partial",
-                "final_answer": str(parsed.get("final_answer", "") or ""),
-                "result_text": response,
-                "key_facts": parsed.get("key_facts", []) if isinstance(parsed.get("key_facts"), list) else [],
-                "confidence": parsed.get("confidence", 0.5) if parsed else 0.5,
+    llm, task_title, task_description, sub_agent_model_name=SUB_AGENT_MODEL,
+    final_summary_instruction="", semantic_matcher=None, scheduler_config=None,
+):
+    config = scheduler_config or SchedulerConfig()
+    tracker = UsageTracker(config)
+    evidence_store = EvidenceStore(config.evidence_max_chars)
+    result = {"schema_version": 2, "final_result": "", "step_outputs": {}, "step_structured": {},
+              "terminate_step": {}, "scheduler_config": asdict(config), "error": ""}
+    controller = None
+    with usage_scope(tracker):
+        try:
+            decomposer = TaskDecomposer(llm_interface=llm)
+            task = decomposer.create_task(task_title, task_description, TaskPriority.HIGH)
+            cache = DecompositionCache(config.plan_cache_path)
+            cache_key = plan_cache_key(
+                task_title, task_description, getattr(llm, "model_name", ""),
+                config.max_plan_tasks, config.allow_direct_plan,
+            )
+            cached_plan = cache.get(cache_key)
+            decomposition = decomposer.decompose(
+                task,
+                max_subtasks=config.max_plan_tasks,
+                allow_direct=config.allow_direct_plan,
+                llm_response=cached_plan,
+            )
+            if cached_plan is None and decomposer.last_llm_response:
+                cache.put(cache_key, decomposer.last_llm_response)
+            result["plan_cache"] = {
+                "enabled": bool(config.plan_cache_path),
+                "hit": cached_plan is not None,
+                "key": cache_key,
             }
+            result["decomposition"] = decomposition.to_dict()
+            _validate_dag(decomposition.sub_tasks)
+            manager = WorkflowManager(model_name=sub_agent_model_name)
+            agents = manager.get_tool_agents() + manager.get_reasoning_agents()
+            matcher = semantic_matcher or SemanticMatcher()
+            scores = build_score_matrix(decomposition.sub_tasks, agents, matcher,
+                                        task_title=task_title, task_description=task_description)
+            controller = ExecutionController(decomposition.sub_tasks, agents, scores, config, tracker,
+                                             _feasibility(decomposition.sub_tasks, agents, config))
+            result["score_matrix"] = scores
 
-        step_outputs[subtask.id] = response
-        step_structured[subtask.id] = structured
+            def execute(subtask, agent, dependencies):
+                local = WorkflowManager(model_name=sub_agent_model_name)
+                dependency_evidence = evidence_store.dependencies(subtask.dependencies, dependencies)
+                dependency_text = {
+                    item["task_id"]: json.dumps(item, ensure_ascii=False)
+                    for item in dependency_evidence
+                }
+                attempt = len(controller.state.tasks[subtask.id].attempts)
+                previous_attempts = []
+                for previous in controller.state.tasks[subtask.id].attempts:
+                    previous_result = previous.get("result", {})
+                    structured = previous_result.get("structured_response") or {}
+                    previous_attempts.append({
+                        "agent_id": previous.get("agent_id", ""),
+                        "failure_kind": previous.get("failure_kind", ""),
+                        "error": str(previous_result.get("error", ""))[:500],
+                        "result_text": str(structured.get("result_text", ""))[:800],
+                    })
+                usage = tracker.snapshot()
+                remaining_tokens = None
+                if config.max_tokens:
+                    remaining_tokens = max(0, config.max_tokens - usage["budget_charged_tokens"])
+                task_context = {
+                    "original_task": {"title": task_title, "description": task_description},
+                    "constraints": task.metadata.get("constraints", []),
+                    "current_work_item": {
+                        "id": subtask.id,
+                        "title": subtask.title,
+                        "description": subtask.description,
+                        "work_type": subtask.metadata.get("work_type", "solve"),
+                        "required_skills": subtask.required_skills,
+                    },
+                    "dependency_evidence": dependency_evidence,
+                    "candidate_answers": evidence_store.candidates(),
+                    "previous_attempts": previous_attempts,
+                    "remaining_budget": {
+                        "tokens": remaining_tokens,
+                        "seconds": max(0.0, tracker.remaining_seconds()),
+                        "attempts": max(0, config.max_attempts - attempt),
+                    },
+                }
+                with usage_scope(tracker, f"{subtask.id}#{attempt}|{agent.agent_id}"):
+                    action, payload = select_action_and_input(
+                        llm, subtask, agent, task_description, dependency_text,
+                        task_context=task_context)
+                    local.create_workflow(f"{subtask.id}_{len(controller.state.tasks[subtask.id].attempts)}",
+                                          subtask.description)
+                    local.add_step(agent.agent_id, action, payload)
+                    workflow = local.execute_workflow()
+                step = extract_workflow_step_result(workflow)
+                outcome = {**step, "success": bool(workflow.get("success")),
+                           "retryable": workflow.get("retryable", True),
+                           "failure_kind": workflow.get("failure_kind", ""),
+                           "action_id": action, "agent_id": agent.agent_id,
+                           "workflow": workflow}
+                if not outcome["success"]:
+                    outcome["failure_kind"] = classify_failure(step, workflow, action)
+                else:
+                    evidence_store.add(subtask.id, outcome)
+                return outcome
 
-        print(f"  Action: {action_id}")
-        print(f"  结果: {response[:120]}...")
-        print(f"  本步 token: {workflow_result.get('total_tokens', 0)}")
+            state = controller.run(execute)
+            result["stop_reason"] = state.stop_reason
+            result["execution"] = controller.to_dict()
+            for task_id, runtime in state.tasks.items():
+                if runtime.status == "succeeded":
+                    result["step_outputs"][task_id] = runtime.result.get("response", "")
+                    result["step_structured"][task_id] = runtime.result.get("structured_response", {})
+                    evidence_store.add(task_id, runtime.result)
+            result["evidence"] = evidence_store.all()
+            result["assignments"] = [
+                {"task_id": task_id, "agent_id": rt.attempts[-1]["agent_id"]}
+                for task_id, rt in state.tasks.items() if rt.attempts
+            ]
+            result["assignment_meta"] = {"mode": config.mode, "rounds": len(state.rounds)}
+            if state.stop_reason not in {"completed", "completed_early"}:
+                result["error"] = state.stop_reason
 
-        executed.add(subtask_id)
-        executing.remove(subtask_id)
-
-    for subtask in decomposition_result.sub_tasks:
-        execute_step(subtask.id)
-
-    print(f"\n总 token 消耗: {total_tokens}")
-
-    print("\n【步骤4】结果汇总")
-    print("-" * 60)
-    all_dependency_ids = set()
-    for subtask in decomposition_result.sub_tasks:
-        all_dependency_ids.update(subtask.dependencies)
-    sink_task_ids = [subtask.id for subtask in decomposition_result.sub_tasks if subtask.id not in all_dependency_ids]
-    if not sink_task_ids:
-        sink_task_ids = list(step_outputs.keys())
-
-    sink_outputs = []
-    for sink_task_id in sink_task_ids:
-        if sink_task_id in step_outputs:
-            sink_outputs.append(f"[{sink_task_id}] {step_outputs[sink_task_id]}")
-    all_step_outputs = [f"[{step_id}] {text}" for step_id, text in step_outputs.items()]
-    structured_facts = []
-    for step_id, info in step_structured.items():
-        facts = info.get("key_facts", [])
-        if isinstance(facts, list):
-            for fact in facts:
-                if isinstance(fact, dict):
-                    structured_facts.append({"step_id": step_id, **fact})
-    merged_result = "\n\n".join(sink_outputs) if sink_outputs else "\n\n".join(all_step_outputs)
-
-    final_result = merged_result
-    terminate_step_result: Dict[str, Any] = {}
-    terminate_agents = workflow_manager.get_terminate_agents()
-    if terminate_agents and (merged_result or all_step_outputs):
-        terminate_agent = terminate_agents[0]
-        summary_instruction = final_summary_instruction or (
-            "You are responsible for final answer extraction. "
-            "For math word problems, compute and provide the final numeric answer. "
-            "Use the final answer from the last calculation step when it is available. "
-            "Return strict JSON with status/final_answer/result_text/key_facts/confidence. "
-            "final_answer must contain only the final answer value (number or short text) with no extra narration. "
-            "Do not place confidence scores, step numbers, or intermediate values in final_answer. "
-            "Your response must be parseable JSON only; do not include analysis text before or after JSON."
-        )
-        aggregate_payload = {
-            "original_task": task_description,
-            "sink_outputs": sink_outputs,
-            "all_step_outputs": all_step_outputs,
-            "structured_facts": structured_facts,
-            "step_structured": step_structured,
-        }
-        workflow_manager.create_workflow("final_terminate", "Aggregate final result")
-        workflow_manager.add_step(
-            terminate_agent.agent_id,
-            "terminate_task",
-            {
-                "result": json.dumps(aggregate_payload, ensure_ascii=False),
-                "summary": summary_instruction,
-            },
-        )
-        terminate_result = workflow_manager.execute_workflow()
-        total_tokens += terminate_result.get("total_tokens", 0)
-        terminate_step_result = extract_workflow_step_result(terminate_result)
-        terminate_response = _safe_text(terminate_step_result.get("response", ""))
-        terminate_structured = terminate_step_result.get("structured_response", {})
-        if not isinstance(terminate_structured, dict):
-            terminate_structured = {}
-
-        candidate = _safe_text(terminate_structured.get("final_answer", ""))
-        if candidate and _looks_like_direct_final_answer(candidate):
-            final_result = candidate
-        elif terminate_response:
-            parsed = safe_json_loads_from_text(terminate_response)
-            parsed_candidate = _safe_text(parsed.get("final_answer", "") if parsed else "")
-            final_result = parsed_candidate if _looks_like_direct_final_answer(parsed_candidate) else terminate_response
-
-    if not final_result:
-        final_result = merged_result
-
-    print_final_result(final_result)
-
-    return {
-        "decomposition": decomposition_result,
-        "assignments": assignments,
-        "assignment_meta": assignment_meta,
-        "score_matrix": score_matrix,
-        "step_outputs": step_outputs,
-        "step_structured": step_structured,
-        "terminate_step": terminate_step_result,
-        "final_result": final_result,
-        "total_tokens": total_tokens,
-    }
+            terminators = manager.get_terminate_agents()
+            if result["step_structured"] and terminators:
+                payload = {
+                    "original_task": task_description,
+                    "evidence": evidence_store.all(),
+                    "candidate_answers": evidence_store.candidates(),
+                    "unresolved_tasks": [
+                        {"id": task_id, "status": rt.status, "error": rt.result.get("error", "")}
+                        for task_id, rt in state.tasks.items() if rt.status != "succeeded"
+                    ],
+                }
+                manager.create_workflow("final_terminate", "Extract final answer")
+                manager.add_step(terminators[0].agent_id, "terminate_task", {
+                    "result": json.dumps(payload, ensure_ascii=False),
+                    "summary": final_summary_instruction or (
+                        "Extract the answer to the original task. Preserve units and exact values. "
+                        "Do not treat incomplete evidence as verified. Return strict JSON with "
+                        "status/final_answer/result_text/key_facts/confidence."
+                    ),
+                })
+                with usage_scope(tracker, "final"):
+                    final = manager.execute_workflow()
+                result["terminate_step"] = extract_workflow_step_result(final)
+                structured = result["terminate_step"].get("structured_response", {})
+                result["final_result"] = str(structured.get("final_answer", "") or "")
+                result["finalization_status"] = "completed" if final.get("success") and result["final_result"] else "failed"
+                if result["finalization_status"] == "failed":
+                    result["error"] = result["error"] or "finalization_failed"
+            else:
+                result["finalization_status"] = "unavailable"
+                result["error"] = result["error"] or "no_final_answer"
+        except (BudgetExceeded, DeadlineExceeded) as exc:
+            reason = "budget_exhausted" if isinstance(exc, BudgetExceeded) else "deadline_exceeded"
+            if result.get("stop_reason") not in {None, "completed", "completed_early"}:
+                result["finalization_status"] = reason
+            else:
+                result["stop_reason"] = reason
+            result["error"] = str(exc)
+        except Exception as exc:
+            result["stop_reason"] = "execution_error"
+            result["error"] = f"{type(exc).__name__}: {exc}"
+        finally:
+            if controller:
+                result["execution"] = controller.to_dict()
+            result["usage"] = tracker.snapshot()
+            result["total_tokens"] = result["usage"]["known_total_tokens"]
+    return result

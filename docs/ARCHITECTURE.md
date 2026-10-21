@@ -1,5 +1,10 @@
 # Architecture Overview
 
+> The active pipeline now supports fixed-DAG rolling assignment. See
+> [Rolling Scheduler](ROLLING_SCHEDULER.md) for current states, accounting,
+> configuration and experiment constraints. The static flow below describes
+> the original architecture.
+
 ## Goal
 
 这个项目实现的是一个“由大模型驱动分工、由 embedding + 匈牙利算法完成分配、由子智能体执行、由终止智能体汇总结果”的多智能体任务处理框架。
@@ -15,14 +20,15 @@
 
 ```text
 User Task
-  -> TaskDecomposer
-  -> Subtasks + dependencies + required skills
+  -> Minimal Planner (DIRECT or bounded DECOMPOSE)
+  -> Work items + dependencies + required/optional metadata
   -> SemanticMatcher
-  -> score matrix
-  -> Hungarian assignment
+  -> utility matrix (fit/reliability/cost/information/diversity/feedback)
+  -> Rolling Hungarian assignment
   -> WorkflowManager
-  -> step execution by sub-agents
-  -> terminate agent aggregation
+  -> step execution with complete Task Context
+  -> compact Evidence Store
+  -> terminate agent aggregation / optional stop
   -> final answer / evaluation result
 ```
 
@@ -57,8 +63,13 @@ User Task
 
 - `assignment_service.py`: 得分矩阵与匈牙利核心分配
 - `action_selection.py`: 子任务到 action 的选择策略
+- `execution_controller.py`: 滚动匈牙利调度、容量、反馈与停止条件
+- `evidence_store.py`: 依赖证据压缩与候选答案存储
+- `failure_classification.py`: transport/format/context/tool/capability 分类
+- `decomposition_cache.py`: 跨实验复用相同任务分解
 - `result_parsing.py`: LLM / workflow 响应解析
 - `single_llm_solver.py`: 单模型基线运行
+- `single_tool_solver.py`: 不经过调度器的单智能体 + Python 工具公平基线
 
 ### `reporters/`
 
@@ -127,7 +138,7 @@ User Task
 
 - 先通过 embedding 生成得分矩阵
 - 再用匈牙利算法做全局最优分配
-- 子智能体执行阶段不重新改写分配结果
+- 每轮仅对 ready 工作项重新构建效用矩阵，并继续使用匈牙利算法求解
 
 ### 2. Sub-agents decide whether to use tools
 

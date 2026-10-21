@@ -12,6 +12,7 @@ from llm.llm_config import (
     SUB_AGENT_MODEL,
     SUB_AGENT_TEMPERATURE,
     SUB_AGENT_TOP_P,
+    SILICONFLOW_EXTRA_BODY,
     sub_agent_llm_model,
 )
 from question_solution.hungarian_algorithm import hungarian_maximum_assignment
@@ -248,6 +249,7 @@ class TextExtractionAgent(BaseAgent):
                 ],
                 temperature=SUB_AGENT_TEMPERATURE,
                 top_p=SUB_AGENT_TOP_P,
+                extra_body=SILICONFLOW_EXTRA_BODY,
             )
 
             result = response.choices[0].message.content
@@ -342,6 +344,7 @@ class BasicComputationAgent(BaseAgent):
                 ],
                 temperature=SUB_AGENT_TEMPERATURE,
                 top_p=SUB_AGENT_TOP_P,
+                extra_body=SILICONFLOW_EXTRA_BODY,
             )
 
             parsed_info = response.usage.prompt_tokens  # 临时存储信息
@@ -386,6 +389,7 @@ class BasicComputationAgent(BaseAgent):
                 ],
                 temperature=SUB_AGENT_TEMPERATURE,
                 top_p=SUB_AGENT_TOP_P,
+                extra_body=SILICONFLOW_EXTRA_BODY,
             )
 
             result = response.choices[0].message.content
@@ -481,6 +485,7 @@ class LogicalReasoningAgent(BaseAgent):
                 ],
                 temperature=SUB_AGENT_TEMPERATURE,
                 top_p=SUB_AGENT_TOP_P,
+                extra_body=SILICONFLOW_EXTRA_BODY,
             )
 
             state["intermediate_steps"].append(
@@ -522,6 +527,7 @@ class LogicalReasoningAgent(BaseAgent):
                 ],
                 temperature=SUB_AGENT_TEMPERATURE,
                 top_p=SUB_AGENT_TOP_P,
+                extra_body=SILICONFLOW_EXTRA_BODY,
             )
 
             state["intermediate_steps"].append(
@@ -568,6 +574,7 @@ class LogicalReasoningAgent(BaseAgent):
                 ],
                 temperature=SUB_AGENT_TEMPERATURE,
                 top_p=SUB_AGENT_TOP_P,
+                extra_body=SILICONFLOW_EXTRA_BODY,
             )
 
             result = response.choices[0].message.content

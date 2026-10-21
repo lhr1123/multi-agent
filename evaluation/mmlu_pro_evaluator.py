@@ -2,6 +2,8 @@
 
 import contextlib
 import io
+import random
+import re
 import threading
 import time
 from typing import Any, Dict, List, Optional
@@ -9,21 +11,20 @@ from typing import Any, Dict, List, Optional
 from llm.llm_config import SUB_AGENT_MODEL
 from pipelines.multi_agent_pipeline import run_multi_agent_flow
 from semantic_matcher import SemanticMatcher
+from models import SchedulerConfig
 from services.single_llm_solver import solve_with_single_llm
+from services.single_tool_solver import solve_with_single_tool_llm
 from utils.answer_utils import (
-    extract_option_letter,
-    extract_option_prediction_from_multi_result,
     is_correct_option_prediction,
-    random_option_fallback,
 )
 from utils.dataset_utils import load_mmlu_pro_dataset, load_mmlu_pro_splits
 from utils.eval_visualization import generate_eval_charts
 
 from evaluation.runtime import (
+    experiment_metadata, prepare_checkpoint, attach_multi_trace, attach_single_usage,
     append_checkpoint_sample,
     build_summary,
     dedupe_samples,
-    load_checkpoint_samples,
     normalize_run_kind,
     print_summary,
     run_items,
@@ -36,6 +37,46 @@ from evaluation.runtime import (
 
 
 OPTION_LABELS = "ABCDEFGHIJ"
+
+
+def stratified_mmlu_samples(samples, limit=None, offset=0, seed=0):
+    """Build a reproducible category-balanced sequence before slicing."""
+    groups = {}
+    for sample in samples:
+        groups.setdefault(str(sample.get("category", "unknown")), []).append(sample)
+    rng = random.Random(seed)
+    categories = sorted(groups)
+    rng.shuffle(categories)
+    for rows in groups.values():
+        rng.shuffle(rows)
+    ordered = []
+    while categories:
+        next_categories = []
+        for category in categories:
+            rows = groups[category]
+            if rows:
+                ordered.append(rows.pop())
+            if rows:
+                next_categories.append(category)
+        categories = next_categories
+    start = max(0, offset)
+    return ordered[start:] if limit is None else ordered[start:start + max(0, limit)]
+
+
+def extract_choice_prediction(text, option_count):
+    """Require an explicit answer, never a letter mentioned only in reasoning."""
+    text = str(text or "").strip()
+    direct = re.fullmatch(r"\(?([A-J])\)?[.!]?", text, re.IGNORECASE)
+    if direct:
+        letter = direct.group(1).upper()
+    else:
+        matches = re.findall(
+            r"(?:\b(?:the\s+)?answer\s+is|\bfinal\s+answer\s*[:：]|答案\s*[:：])"
+            r"\s*\(?([A-J])\)?(?=\s*(?:[.!。]|$))", text, re.IGNORECASE)
+        if not matches or len({m.upper() for m in matches}) != 1:
+            return None
+        letter = matches[-1].upper()
+    return letter if letter in OPTION_LABELS[:option_count] else None
 
 
 def _format_options(options: List[str]) -> str:
@@ -89,12 +130,17 @@ def _build_mmlu_task_description(
     return "\n\n".join(prompt_parts)
 
 
-def _solve_mmlu_multiple_choice_with_single_llm(llm, sample: Dict[str, Any], category_prefix: str = "") -> Dict[str, Any]:
+def _solve_mmlu_multiple_choice_with_single_llm(
+    llm, sample: Dict[str, Any], category_prefix: str = "", scheduler_config=None,
+    single_baseline_mode: str = "plain",
+) -> Dict[str, Any]:
     task_description = _build_mmlu_task_description(sample, category_prefix=category_prefix)
-    return solve_with_single_llm(
+    solver = solve_with_single_tool_llm if single_baseline_mode == "python" else solve_with_single_llm
+    return solver(
         llm,
         task_title=f"MMLU_Pro_{sample.get('question_id', 'unknown')}",
         task_description=task_description,
+        scheduler_config=scheduler_config,
         system_prompt="You are an expert multiple-choice problem solver.",
         output_schema=(
             '{\n'
@@ -166,22 +212,42 @@ def evaluate_multi_agent_on_mmlu_pro(
     checkpoint_path: Optional[str] = None,
     resume: bool = False,
     charts_during_run: bool = True,
+    scheduler_config=None,
+    sample_strategy: str = "sequential",
+    single_baseline_mode: str = "plain",
 ) -> Dict[str, Any]:
     run_kind = normalize_run_kind(run_kind, compare_single_baseline=compare_single_baseline)
+    scheduler_config = scheduler_config or SchedulerConfig()
+    if single_baseline_mode not in {"plain", "python"}:
+        raise ValueError("single_baseline_mode must be plain or python")
     include_multi = should_run_multi(run_kind)
     include_single = should_run_single(run_kind)
     if include_single and single_llm is None:
         raise ValueError("single_llm is required when run_kind includes single")
 
     splits = load_mmlu_pro_splits(dataset_path)
-    test_samples = load_mmlu_pro_dataset(dataset_path, split="test", limit=limit, offset=offset)
+    if sample_strategy not in {"sequential", "stratified"}:
+        raise ValueError("sample_strategy must be sequential or stratified")
+    if sample_strategy == "stratified":
+        test_samples = stratified_mmlu_samples(
+            splits.get("test", []), limit=limit, offset=offset, seed=scheduler_config.seed)
+    else:
+        test_samples = load_mmlu_pro_dataset(dataset_path, split="test", limit=limit, offset=offset)
     validation_samples = splits.get("validation", [])
     prompts_by_category = _build_category_prefix(validation_samples, shots_per_category) if validation_samples else {}
 
     if not test_samples:
         raise ValueError(f"No MMLU-Pro test samples loaded from dataset: {dataset_path}")
 
-    checkpoint_samples, loaded_keys = load_checkpoint_samples(checkpoint_path, "mmlu-pro") if resume else ([], set())
+    metadata = experiment_metadata(scheduler_config, orchestrator_llm, sub_agent_model_name, single_llm,
+                                   benchmark="mmlu-pro", dataset_path=dataset_path, run_kind=run_kind,
+                                   shots_per_category=shots_per_category,
+                                   sample_strategy=sample_strategy,
+                                   single_baseline_mode=single_baseline_mode,
+                                   category_prompts=prompts_by_category)
+    checkpoint_samples, loaded_keys = prepare_checkpoint(checkpoint_path, "mmlu-pro", resume, metadata)
+    selected_keys = {str(item.get("question_id")) for item in test_samples}
+    checkpoint_samples = [s for s in checkpoint_samples if sample_key(s, "mmlu-pro") in selected_keys]
     completed_keys = {
         sample_key(sample, "mmlu-pro")
         for sample in checkpoint_samples
@@ -199,11 +265,12 @@ def evaluate_multi_agent_on_mmlu_pro(
     print("MMLU-Pro Dataset Evaluation")
     print("=" * 60)
     print(f"dataset_path: {dataset_path}")
-    print(f"samples: {total}, offset: {max(0, offset)}, limit: {limit if limit is not None else 'all'}")
+    print(f"samples: {total}, offset: {max(0, offset)}, limit: {limit if limit is not None else 'all'}, strategy: {sample_strategy}")
     print(f"run_kind: {run_kind}, workers: {max(1, workers)}")
     print(f"orchestrator_model: {orchestrator_llm.model_name}")
     print(f"sub_agent_model: {sub_agent_model_name}")
     print(f"single_baseline_model: {single_llm.model_name if include_single else None}")
+    print(f"single_baseline_mode: {single_baseline_mode if include_single else None}")
     print(f"checkpoint_path: {checkpoint_path or 'off'}, resume: {resume}, loaded: {len(loaded_keys)}, skipped: {len(completed_keys)}")
     print(f"few-shot validation examples per category: {shots_per_category if validation_samples else 0}")
 
@@ -230,6 +297,7 @@ def evaluate_multi_agent_on_mmlu_pro(
                         "final_answer must be exactly one option letter from A to J, with no extra text."
                     ),
                     "semantic_matcher": semantic_matcher,
+                    "scheduler_config": scheduler_config,
                 }
                 if suppress_stdout:
                     with contextlib.redirect_stdout(io.StringIO()):
@@ -238,8 +306,11 @@ def evaluate_multi_agent_on_mmlu_pro(
                     multi_result = run_multi_agent_flow(orchestrator_llm, **kwargs)
                 multi_entry["elapsed_seconds"] = time.time() - start
                 multi_entry["final_result"] = str(multi_result.get("final_result", "") or "")[:1200]
-                multi_entry["prediction"] = extract_option_prediction_from_multi_result(multi_result)
+                multi_entry["prediction"] = extract_choice_prediction(
+                    multi_result.get("final_result", ""), len(item.get("options", [])))
                 multi_entry["tokens"] = int(multi_result.get("total_tokens", 0) or 0)
+                attach_multi_trace(multi_entry, multi_result)
+                multi_entry["parse_failed"] = multi_entry["prediction"] is None
                 multi_entry["is_correct"] = is_correct_option_prediction(multi_entry["prediction"], target)
             except Exception as exc:
                 multi_entry["elapsed_seconds"] = time.time() - start
@@ -254,21 +325,28 @@ def evaluate_multi_agent_on_mmlu_pro(
                     single_llm,
                     item,
                     category_prefix=category_prefix,
+                    scheduler_config=scheduler_config,
+                    single_baseline_mode=single_baseline_mode,
                 )
                 single_entry["elapsed_seconds"] = time.time() - single_start
-                single_entry["answer_text"] = str(single_result.get("answer", "") or "")[:1000]
-                single_entry["prediction"] = extract_option_letter(single_entry["answer_text"])
-                if single_entry["prediction"] is None:
-                    single_entry["prediction"] = random_option_fallback(len(list(item.get("options", []) or [])))
+                single_entry["answer_text"] = str(single_result.get("answer", "") or "")
+                single_entry["prediction"] = extract_choice_prediction(
+                    single_entry["answer_text"], len(item.get("options", [])))
+                single_entry["parse_failed"] = single_entry["prediction"] is None
                 single_entry["tokens"] = int(
                     (single_result.get("tokens_used", {}) or {}).get("total_tokens", 0) or 0
                 )
                 single_entry["is_correct"] = is_correct_option_prediction(single_entry["prediction"], target)
+                single_entry["baseline_mode"] = single_baseline_mode
+                attach_single_usage(single_entry, single_result)
             except Exception as exc:
                 single_entry["elapsed_seconds"] = time.time() - single_start
                 single_entry["error"] = str(exc)
+                single_entry["baseline_mode"] = single_baseline_mode
+                attach_single_usage(single_entry, error=exc)
 
         return {
+            "experiment": metadata,
             "question_id": question_id,
             "category": category,
             "target": target,
@@ -303,6 +381,7 @@ def evaluate_multi_agent_on_mmlu_pro(
         dataset_path=dataset_path,
         samples=sample_results,
         config={
+            "experiment": metadata,
             "offset": max(0, offset),
             "limit": limit,
             "run_kind": run_kind,
@@ -314,8 +393,10 @@ def evaluate_multi_agent_on_mmlu_pro(
             "orchestrator_model": orchestrator_llm.model_name,
             "sub_agent_model": sub_agent_model_name,
             "single_baseline_model": single_llm.model_name if include_single else None,
+            "single_baseline_mode": single_baseline_mode if include_single else None,
             "quiet_per_sample": quiet_per_sample,
             "shots_per_category": shots_per_category,
+            "sample_strategy": sample_strategy,
             "validation_available": bool(validation_samples),
         },
         include_multi=include_multi,

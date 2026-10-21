@@ -1,5 +1,9 @@
 # Multi-Agent Task Allocation System
 
+当前多智能体流程默认使用滚动匈牙利调度；`--scheduler static` 可运行修正后的静态对照。
+运行参数、计账口径和测试命令见 [滚动调度说明](docs/ROLLING_SCHEDULER.md)。
+新评测使用 schema v2，请使用新的结果和断点路径。
+
 一个面向数学推理与任务分配实验的多智能体系统。当前代码基线为 `1.4` 版本，后续迭代均建议基于这一版本继续开发。
 
 系统主流程是：

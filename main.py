@@ -6,6 +6,7 @@ this file can stay focused on argument parsing and high-level dispatch.
 """
 
 import argparse
+import json
 import os
 import sys
 
@@ -21,6 +22,8 @@ from llm.llm_config import (
 from llm.llm_interface import SiliconFlowLLMInterface
 from pipelines.multi_agent_pipeline import run_multi_agent_flow
 from services.single_llm_solver import solve_with_single_llm
+from services.single_tool_solver import solve_with_single_tool_llm
+from models import SchedulerConfig
 
 
 if sys.platform == "win32":
@@ -72,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Start index offset in dataset.",
     )
     parser.add_argument(
+        "--sample-strategy",
+        choices=["sequential", "stratified"],
+        default="sequential",
+        help="MMLU-Pro sample selection strategy.",
+    )
+    parser.add_argument(
         "--save-path",
         type=str,
         default=None,
@@ -88,6 +97,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="multi",
         choices=["multi", "single", "both"],
         help="Dataset run side: multi=multi-agent only, single=baseline only, both=run both. Old --compare-single behavior is preserved.",
+    )
+    parser.add_argument(
+        "--single-baseline",
+        dest="single_baseline_mode",
+        choices=["plain", "python"],
+        default="plain",
+        help="Single-agent baseline: plain model call or one agent with the shared Python executor.",
     )
     parser.add_argument(
         "--workers",
@@ -116,11 +132,75 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print full per-sample execution logs during dataset evaluation.",
     )
+    parser.add_argument("--scheduler", choices=["static", "rolling-hungarian"])
+    parser.add_argument("--scheduler-config", help="JSON file with SchedulerConfig fields")
+    parser.add_argument("--assignment-policy", choices=["hungarian", "greedy", "random"])
+    parser.add_argument("--max-parallel", type=int, help="Concurrent operations per sample")
+    parser.add_argument("--service-concurrency", type=int, help="Concurrent calls per endpoint across samples")
+    parser.add_argument("--agent-capacity", action="append", default=[], metavar="AGENT=N")
+    parser.add_argument("--max-attempts", type=int)
+    parser.add_argument("--max-tokens", type=int, help="Per-sample token budget; 0 is unlimited")
+    parser.add_argument("--max-output-tokens", type=int)
+    parser.add_argument("--final-reserve-tokens", type=int)
+    parser.add_argument("--deadline-seconds", type=float)
+    parser.add_argument("--seed", type=int, help="Assignment random seed; not an API generation seed")
+    parser.add_argument("--max-plan-tasks", type=int, help="Maximum planned work items per sample")
+    parser.add_argument("--plan-cache-path", help="JSONL plan cache shared by scheduler variants")
+    parser.add_argument("--evidence-max-chars", type=int, help="Maximum compact evidence characters")
+    parser.add_argument("--optional-utility-threshold", type=float,
+                        help="Minimum utility required to execute optional work")
+    parser.add_argument("--reliability-priors", help="JSON file of frozen development-set agent priors")
+    parser.add_argument("--no-direct-plan", action="store_true")
+    parser.add_argument("--no-early-stop-optional", action="store_true")
+    parser.add_argument("--no-feedback", action="store_true")
     return parser
+
+
+def scheduler_config_from_args(args):
+    values = {}
+    if args.scheduler_config:
+        with open(args.scheduler_config, encoding="utf-8") as file:
+            values = json.load(file)
+        if not isinstance(values, dict):
+            raise ValueError("Scheduler config must be a JSON object")
+    for arg, key in (
+        ("scheduler", "mode"), ("assignment_policy", "policy"),
+        ("max_parallel", "max_parallel"), ("service_concurrency", "service_concurrency"),
+        ("max_attempts", "max_attempts"), ("max_tokens", "max_tokens"),
+        ("max_output_tokens", "max_output_tokens"), ("final_reserve_tokens", "final_reserve_tokens"),
+        ("deadline_seconds", "deadline_seconds"), ("seed", "seed"),
+        ("max_plan_tasks", "max_plan_tasks"), ("plan_cache_path", "plan_cache_path"),
+        ("evidence_max_chars", "evidence_max_chars"),
+        ("optional_utility_threshold", "optional_utility_threshold"),
+    ):
+        if getattr(args, arg) is not None:
+            values[key] = getattr(args, arg)
+    if args.agent_capacity:
+        capacities = dict(values.get("capacities", {}))
+        for item in args.agent_capacity:
+            agent, count = item.rsplit("=", 1)
+            capacities[agent] = int(count)
+        values["capacities"] = capacities
+    if args.reliability_priors:
+        with open(args.reliability_priors, encoding="utf-8") as file:
+            priors = json.load(file)
+        if isinstance(priors, dict) and "reliability_priors" in priors:
+            priors = priors["reliability_priors"]
+        if not isinstance(priors, dict):
+            raise ValueError("Reliability priors must be a JSON object keyed by agent ID")
+        values["reliability_priors"] = priors
+    if args.no_feedback:
+        values["feedback"] = False
+    if args.no_direct_plan:
+        values["allow_direct_plan"] = False
+    if args.no_early_stop_optional:
+        values["early_stop_optional"] = False
+    return SchedulerConfig(**values)
 
 
 def main() -> None:
     args = build_parser().parse_args()
+    scheduler_config = scheduler_config_from_args(args)
 
     orchestrator_llm = SiliconFlowLLMInterface(
         client=task_orchestrator_llm_model,
@@ -156,6 +236,9 @@ def main() -> None:
                 checkpoint_path=args.checkpoint_path,
                 resume=args.resume,
                 charts_during_run=not args.no_charts_during_run,
+                scheduler_config=scheduler_config,
+                sample_strategy=args.sample_strategy,
+                single_baseline_mode=args.single_baseline_mode,
             )
         else:
             evaluate_multi_agent_on_gsmhard(
@@ -173,8 +256,13 @@ def main() -> None:
                 checkpoint_path=args.checkpoint_path,
                 resume=args.resume,
                 charts_during_run=not args.no_charts_during_run,
+                scheduler_config=scheduler_config,
+                single_baseline_mode=args.single_baseline_mode,
             )
         return
+
+    single_solver = (solve_with_single_tool_llm
+                     if args.single_baseline_mode == "python" else solve_with_single_llm)
 
     if args.mode == "both":
         print("\n" + "=" * 60)
@@ -183,32 +271,38 @@ def main() -> None:
 
         print("\n【实验】单一大模型")
         print("-" * 60)
-        single_result = solve_with_single_llm(single_llm, DEFAULT_TASK_TITLE, DEFAULT_TASK_DESCRIPTION)
+        single_result = single_solver(single_llm, DEFAULT_TASK_TITLE, DEFAULT_TASK_DESCRIPTION,
+                                      scheduler_config=scheduler_config)
         print(f"答案: {single_result.get('answer', 'N/A')}")
         print(f"Token消耗: {single_result['tokens_used']['total_tokens']}")
 
         print("\n" + "=" * 60)
         print("【实验】多智能体系统")
         print("-" * 60)
-        run_multi_agent_flow(
+        multi_result = run_multi_agent_flow(
             orchestrator_llm,
             DEFAULT_TASK_TITLE,
             DEFAULT_TASK_DESCRIPTION,
             sub_agent_model_name=SUB_AGENT_MODEL,
+            scheduler_config=scheduler_config,
         )
+        print(json.dumps(multi_result, ensure_ascii=False, indent=2))
         return
 
     if args.mode == "single":
-        result = solve_with_single_llm(single_llm, DEFAULT_TASK_TITLE, DEFAULT_TASK_DESCRIPTION)
+        result = single_solver(single_llm, DEFAULT_TASK_TITLE, DEFAULT_TASK_DESCRIPTION,
+                               scheduler_config=scheduler_config)
         print(f"答案: {result.get('answer', 'N/A')}")
         return
 
-    run_multi_agent_flow(
+    multi_result = run_multi_agent_flow(
         orchestrator_llm,
         DEFAULT_TASK_TITLE,
         DEFAULT_TASK_DESCRIPTION,
         sub_agent_model_name=SUB_AGENT_MODEL,
+        scheduler_config=scheduler_config,
     )
+    print(json.dumps(multi_result, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

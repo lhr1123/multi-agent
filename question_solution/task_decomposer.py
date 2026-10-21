@@ -24,8 +24,10 @@ class TaskDecomposer:
             llm_interface: LLM接口实现，如果为None则使用MockLLMInterface（仅用于测试）
         """
         self.llm = llm_interface if llm_interface is not None else MockLLMInterface()
+        self.last_llm_response: Optional[Dict[str, Any]] = None
     
-    def decompose(self, task: Task) -> TaskDecompositionResult:
+    def decompose(self, task: Task, max_subtasks: int = 3, allow_direct: bool = True,
+                  llm_response: Optional[Dict[str, Any]] = None) -> TaskDecompositionResult:
         """
         分解任务为子任务
         
@@ -36,11 +38,45 @@ class TaskDecomposer:
             TaskDecompositionResult: 包含子任务列表的分解结果
         """
         # 调用LLM进行任务分解
-        llm_response = self.llm.decompose_task(
-            task_title=task.title,
-            task_description=task.description,
-            task_priority=task.priority.value
-        )
+        if llm_response is None:
+            llm_response = self.llm.decompose_task(
+                task_title=task.title,
+                task_description=task.description,
+                task_priority=task.priority.value,
+                max_subtasks=max_subtasks,
+                allow_direct=allow_direct,
+            )
+        self.last_llm_response = llm_response
+
+        plan_mode = str(llm_response.get("mode", "DECOMPOSE")).upper()
+        raw_subtasks = llm_response.get("sub_tasks", [])
+        if allow_direct and (plan_mode == "DIRECT" or len(raw_subtasks) > max_subtasks):
+            first = raw_subtasks[0] if raw_subtasks else {}
+            skills = []
+            for item in raw_subtasks:
+                for skill in item.get("required_skills", []) if isinstance(item, dict) else []:
+                    if skill not in skills:
+                        skills.append(skill)
+            direct_metadata = dict(first.get("metadata", {})) if (
+                plan_mode == "DIRECT" and isinstance(first.get("metadata", {}), dict)
+            ) else {}
+            direct_metadata.update({"work_type": direct_metadata.get("work_type", "solve"),
+                                    "required": True})
+            llm_response = {
+                "mode": "DIRECT",
+                "sub_tasks": [{
+                    "title": first.get("title") or task.title or "Direct solution",
+                    "description": task.description,
+                    "priority": task.priority.value,
+                    "required_skills": skills,
+                    "dependencies": [],
+                    "metadata": direct_metadata,
+                }],
+                "decomposition_strategy": (
+                    "DIRECT selected by planner" if plan_mode == "DIRECT"
+                    else f"Collapsed plan exceeding max_subtasks={max_subtasks} to DIRECT"
+                ),
+            }
         
         # 解析LLM返回的结果
         sub_tasks = self._parse_llm_response(llm_response, task.id)
@@ -86,6 +122,12 @@ class TaskDecomposer:
             priority = self._parse_priority(priority_str)
             
             # 创建子任务对象
+            metadata = sub_task_data.get("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+            metadata.setdefault("work_type", "solve")
+            metadata.setdefault("required", True)
+            metadata["plan_mode"] = str(llm_response.get("mode", "DECOMPOSE")).upper()
             sub_task = SubTask(
                 id=f"{task_id_base}_subtask_{i}",
                 title=sub_task_data.get("title", f"子任务 {i+1}"),
@@ -95,7 +137,7 @@ class TaskDecomposer:
                 estimated_time=sub_task_data.get("estimated_time"),
                 required_skills=sub_task_data.get("required_skills", []),
                 dependencies=[],  # 先设为空，后续处理
-                metadata=sub_task_data.get("metadata", {})
+                metadata=metadata
             )
             
             # 保存依赖索引信息（LLM返回的是索引，需要转换为ID）
@@ -104,6 +146,9 @@ class TaskDecomposer:
             
             sub_tasks.append(sub_task)
         
+        if sub_tasks and not any(bool(task.metadata.get("required", True)) for task in sub_tasks):
+            sub_tasks[0].metadata["required"] = True
+
         # 处理依赖关系：将索引转换为实际的子任务ID
         for i, sub_task in enumerate(sub_tasks):
             dependency_indices = sub_task.metadata.get("_dependency_indices", [])
@@ -114,7 +159,7 @@ class TaskDecomposer:
                     dependency_ids.append(sub_tasks[dep_idx].id)
                 else:
                     # 如果依赖索引无效，记录警告但不中断
-                    print(f"警告: 子任务 {i} 的依赖索引 {dep_idx} 无效，已忽略")
+                    raise ValueError(f"Invalid dependency index {dep_idx} for subtask {i}")
             
             sub_task.dependencies = dependency_ids
             # 清理临时元数据

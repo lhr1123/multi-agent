@@ -1,14 +1,31 @@
 """Single-LLM baseline execution helpers."""
 
 import json
-import re
 import time
 
-from llm.llm_config import SINGLE_BASELINE_TEMPERATURE, SINGLE_BASELINE_TOP_P
+from llm.llm_config import (
+    SILICONFLOW_EXTRA_BODY,
+    SINGLE_BASELINE_TEMPERATURE,
+    SINGLE_BASELINE_TOP_P,
+)
 from services.result_parsing import strip_code_fence
+from services.usage_tracker import UsageTracker, usage_scope, tracked_completion
 
 
-def solve_with_single_llm(
+def solve_with_single_llm(llm, task_title, task_description, *args, scheduler_config=None, **kwargs):
+    tracker = UsageTracker(scheduler_config)
+    with usage_scope(tracker, "single"):
+        try:
+            result = _solve_with_single_llm(llm, task_title, task_description, *args, **kwargs)
+        except Exception as exc:
+            exc.usage_report = tracker.snapshot()
+            raise
+    result["usage"] = tracker.snapshot()
+    result["tokens_used"]["total_tokens"] = result["usage"]["known_total_tokens"]
+    return result
+
+
+def _solve_with_single_llm(
     llm,
     task_title: str,
     task_description: str,
@@ -28,7 +45,7 @@ def solve_with_single_llm(
     )
 
     start_time = time.time()
-    response = llm.client.chat.completions.create(
+    response = tracked_completion(llm.client, stage="final",
         model=llm.model_name,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -36,6 +53,7 @@ def solve_with_single_llm(
         ],
         temperature=SINGLE_BASELINE_TEMPERATURE,
         top_p=SINGLE_BASELINE_TOP_P,
+        extra_body=SILICONFLOW_EXTRA_BODY,
     )
     end_time = time.time()
 
@@ -43,10 +61,12 @@ def solve_with_single_llm(
     json_str = strip_code_fence(content)
     try:
         result = json.loads(json_str)
-    except json.JSONDecodeError:
-        numbers = re.findall(r"-?\d+(?:\.\d+)?", content)
-        answer = numbers[-1] if numbers else content
-        result = {"answer": answer, "reasoning": "JSON parse failed"}
+        if not isinstance(result, dict):
+            raise ValueError("Expected object")
+    except (json.JSONDecodeError, ValueError):
+        result = {"answer": content, "reasoning": "JSON parse failed", "json_parse_failed": True}
+    result["raw_response"] = content
+    result["baseline_mode"] = "plain"
 
     result["tokens_used"] = {
         "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,

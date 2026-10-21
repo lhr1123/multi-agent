@@ -9,7 +9,9 @@ from typing import Any, Dict, Optional
 from llm.llm_config import SUB_AGENT_MODEL
 from pipelines.multi_agent_pipeline import run_multi_agent_flow
 from semantic_matcher import SemanticMatcher
+from models import SchedulerConfig
 from services.single_llm_solver import solve_with_single_llm
+from services.single_tool_solver import solve_with_single_tool_llm
 from utils.answer_utils import (
     extract_best_number_from_sources,
     extract_prediction_from_multi_result,
@@ -19,10 +21,10 @@ from utils.dataset_utils import load_gsmhard_dataset
 from utils.eval_visualization import generate_eval_charts
 
 from evaluation.runtime import (
+    experiment_metadata, prepare_checkpoint, attach_multi_trace, attach_single_usage,
     append_checkpoint_sample,
     build_summary,
     dedupe_samples,
-    load_checkpoint_samples,
     normalize_run_kind,
     print_summary,
     run_items,
@@ -71,8 +73,16 @@ def evaluate_multi_agent_on_gsmhard(
     checkpoint_path: Optional[str] = None,
     resume: bool = False,
     charts_during_run: bool = True,
+    scheduler_config=None,
+    single_baseline_mode: str = "plain",
 ) -> Dict[str, Any]:
     run_kind = normalize_run_kind(run_kind, compare_single_baseline=compare_single_baseline)
+    scheduler_config = scheduler_config or SchedulerConfig()
+    if single_baseline_mode not in {"plain", "python"}:
+        raise ValueError("single_baseline_mode must be plain or python")
+    metadata = experiment_metadata(scheduler_config, orchestrator_llm, sub_agent_model_name, single_llm,
+                                   benchmark="gsm-hard", dataset_path=dataset_path, run_kind=run_kind,
+                                   single_baseline_mode=single_baseline_mode)
     include_multi = should_run_multi(run_kind)
     include_single = should_run_single(run_kind)
     if include_single and single_llm is None:
@@ -82,7 +92,9 @@ def evaluate_multi_agent_on_gsmhard(
     if not tasks:
         raise ValueError(f"No samples loaded from dataset: {dataset_path}")
 
-    checkpoint_samples, loaded_keys = load_checkpoint_samples(checkpoint_path, "gsm-hard") if resume else ([], set())
+    checkpoint_samples, loaded_keys = prepare_checkpoint(checkpoint_path, "gsm-hard", resume, metadata)
+    selected_keys = {str(item.get("index")) for item in tasks}
+    checkpoint_samples = [s for s in checkpoint_samples if sample_key(s, "gsm-hard") in selected_keys]
     completed_keys = {
         sample_key(sample, "gsm-hard")
         for sample in checkpoint_samples
@@ -105,6 +117,7 @@ def evaluate_multi_agent_on_gsmhard(
     print(f"orchestrator_model: {orchestrator_llm.model_name}")
     print(f"sub_agent_model: {sub_agent_model_name}")
     print(f"single_baseline_model: {single_llm.model_name if include_single else None}")
+    print(f"single_baseline_mode: {single_baseline_mode if include_single else None}")
     print(f"checkpoint_path: {checkpoint_path or 'off'}, resume: {resume}, loaded: {len(loaded_keys)}, skipped: {len(completed_keys)}")
 
     def evaluate_one(item: Dict[str, Any]) -> Dict[str, Any]:
@@ -122,6 +135,7 @@ def evaluate_multi_agent_on_gsmhard(
                     "task_description": question,
                     "sub_agent_model_name": sub_agent_model_name,
                     "semantic_matcher": semantic_matcher,
+                    "scheduler_config": scheduler_config,
                 }
                 if suppress_stdout:
                     with contextlib.redirect_stdout(io.StringIO()):
@@ -132,6 +146,7 @@ def evaluate_multi_agent_on_gsmhard(
                 multi_entry["final_result"] = str(multi_result.get("final_result", "") or "")[:1200]
                 multi_entry["prediction"] = extract_prediction_from_multi_result(multi_result)
                 multi_entry["tokens"] = int(multi_result.get("total_tokens", 0) or 0)
+                attach_multi_trace(multi_entry, multi_result)
                 multi_entry["is_correct"] = is_correct_prediction(multi_entry["prediction"], target)
             except Exception as exc:
                 multi_entry["elapsed_seconds"] = time.time() - start
@@ -142,9 +157,12 @@ def evaluate_multi_agent_on_gsmhard(
             single_entry = _empty_single_entry()
             single_start = time.time()
             try:
-                single_result = solve_with_single_llm(single_llm, f"GSM_hard_{idx}_", question)
+                solver = (solve_with_single_tool_llm
+                          if single_baseline_mode == "python" else solve_with_single_llm)
+                single_result = solver(single_llm, f"GSM_hard_{idx}_", question,
+                                       scheduler_config=scheduler_config)
                 single_entry["elapsed_seconds"] = time.time() - single_start
-                single_entry["answer_text"] = str(single_result.get("answer", "") or "")[:1000]
+                single_entry["answer_text"] = str(single_result.get("answer", "") or "")
                 single_entry["prediction"] = extract_best_number_from_sources(
                     [("single_answer", single_entry["answer_text"], 2.0)]
                 )
@@ -152,11 +170,16 @@ def evaluate_multi_agent_on_gsmhard(
                     (single_result.get("tokens_used", {}) or {}).get("total_tokens", 0) or 0
                 )
                 single_entry["is_correct"] = is_correct_prediction(single_entry["prediction"], target)
+                single_entry["baseline_mode"] = single_baseline_mode
+                attach_single_usage(single_entry, single_result)
             except Exception as exc:
                 single_entry["elapsed_seconds"] = time.time() - single_start
                 single_entry["error"] = str(exc)
+                single_entry["baseline_mode"] = single_baseline_mode
+                attach_single_usage(single_entry, error=exc)
 
         return {
+            "experiment": metadata,
             "dataset_index": idx,
             "target": target,
             "question": question,
@@ -189,6 +212,7 @@ def evaluate_multi_agent_on_gsmhard(
         dataset_path=dataset_path,
         samples=sample_results,
         config={
+            "experiment": metadata,
             "offset": max(0, offset),
             "limit": limit,
             "run_kind": run_kind,
@@ -200,6 +224,7 @@ def evaluate_multi_agent_on_gsmhard(
             "orchestrator_model": orchestrator_llm.model_name,
             "sub_agent_model": sub_agent_model_name,
             "single_baseline_model": single_llm.model_name if include_single else None,
+            "single_baseline_mode": single_baseline_mode if include_single else None,
             "quiet_per_sample": quiet_per_sample,
         },
         include_multi=include_multi,

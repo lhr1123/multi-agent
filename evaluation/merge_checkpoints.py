@@ -67,6 +67,10 @@ def merge_checkpoint_files(
     for path in paths:
         samples.extend(_read_samples(path))
 
+    fingerprints = {s.get("experiment", {}).get("fingerprint") for s in samples}
+    if len(fingerprints) > 1:
+        raise ValueError("Cannot merge different experiment configurations or schema versions")
+
     merged_samples = dedupe_samples(samples, benchmark)
     include_multi = any(sample.get("multi_agent") for sample in merged_samples)
     include_single = any(sample.get("single_baseline") for sample in merged_samples)

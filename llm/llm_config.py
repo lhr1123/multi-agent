@@ -76,6 +76,11 @@ SINGLE_BASELINE_BASE_URL = _env_with_fallback(
 LLM_TEMPERATURE = _float_env_with_fallback("LLM_TEMPERATURE", "", 0.0)
 LLM_TOP_P = _float_env_with_fallback("LLM_TOP_P", "", 1.0)
 
+# Qwen3.8 defaults to thinking mode on SiliconFlow. Keep it explicitly disabled
+# for every request so all experiment paths use the same inference mode.
+ENABLE_THINKING = False
+SILICONFLOW_EXTRA_BODY = {"enable_thinking": ENABLE_THINKING}
+
 # Role-specific sampling configuration.
 TASK_ORCHESTRATOR_TEMPERATURE = _float_env_with_fallback(
     "TASK_ORCHESTRATOR_TEMPERATURE",
@@ -114,14 +119,14 @@ SINGLE_BASELINE_TOP_P = _float_env_with_fallback(
 # Task orchestration layer model.
 # Responsible for task decomposition, dependency planning,
 # workflow coordination, and final answer extraction.
-TASK_ORCHESTRATOR_MODEL = "Qwen3.6-35B-A3B"
+TASK_ORCHESTRATOR_MODEL = "Qwen/Qwen3.8-27B"
 
 # Sub-agent execution model.
 # Responsible for subtask reasoning and deciding whether to use tools.
-SUB_AGENT_MODEL = "llama3.1-8b"
+SUB_AGENT_MODEL = "Qwen/Qwen3.8-27B"
 
 # Single-model baseline used in evaluation mode.
-SINGLE_BASELINE_MODEL = "llama3.1-8b"
+SINGLE_BASELINE_MODEL = "Qwen/Qwen3.8-27B"
 
 # Default fallback model when no explicit model is passed.
 DEFAULT_MODEL = TASK_ORCHESTRATOR_MODEL

@@ -1,9 +1,49 @@
 """Assignment helpers for semantic matching and Hungarian-core allocation."""
 
 import re
+import math
+import random
 from typing import Any, Dict, List, Tuple
 
 from question_solution.hungarian_algorithm import hungarian_maximum_assignment
+
+
+def assign_with_capacities(matrix, capacities, feasible=None, policy="hungarian", seed=0):
+    """Maximum-weight optional matching; -1 means defer, never complete."""
+    n = len(matrix)
+    m = len(capacities)
+    if any(len(row) != m for row in matrix):
+        raise ValueError("Score matrix width must match capacities")
+    if any(not isinstance(c, int) or c < 0 for c in capacities):
+        raise ValueError("Capacities must be nonnegative integers")
+    if any(not math.isfinite(v) for row in matrix for v in row):
+        raise ValueError("Scores must be finite")
+    feasible = feasible if feasible is not None else [[True] * m for _ in range(n)]
+    if len(feasible) != n or any(len(row) != m for row in feasible):
+        raise ValueError("Feasibility mask shape mismatch")
+    slots = [j for j, count in enumerate(capacities) for _ in range(min(count, n))]
+    if not n or not slots:
+        return [-1] * n
+    if policy in {"greedy", "random"}:
+        edges = [(i, j) for i in range(n) for j in range(m) if feasible[i][j] and matrix[i][j] > 0]
+        if policy == "greedy":
+            edges.sort(key=lambda edge: (-matrix[edge[0]][edge[1]], edge))
+        else:
+            random.Random(seed).shuffle(edges)
+        result, remaining = [-1] * n, list(capacities)
+        for i, j in edges:
+            if result[i] < 0 and remaining[j] > 0:
+                result[i] = j
+                remaining[j] -= 1
+        return result
+    if policy != "hungarian":
+        raise ValueError("Unknown assignment policy")
+    forbidden = -(1 + sum(abs(v) for row in matrix for v in row))
+    expanded = [[row[j] if feasible[i][j] else forbidden for j in slots] + [0.0] * n
+                for i, row in enumerate(matrix)]
+    assignment, _ = hungarian_maximum_assignment(expanded)
+    return [slots[k] if 0 <= k < len(slots) and matrix[i][slots[k]] > 0 else -1
+            for i, k in enumerate(assignment)]
 
 
 EXTERNAL_AGENT_IDS = {"arxivagent", "bingagent", "websiteagent"}
@@ -127,7 +167,9 @@ def build_score_matrix(
         row = []
         for agent in agents:
             capabilities = agent.capabilities or []
-            score = semantic_matcher.get_match_score(required_skills, capabilities)
+            score = (semantic_matcher.get_task_match_score(subtask, agent)
+                     if hasattr(semantic_matcher, "get_task_match_score")
+                     else semantic_matcher.get_match_score(required_skills, capabilities))
             score += _score_adjustment(agent, subtask, routing_context)
             score = max(0, min(10, score))
             row.append(score)
