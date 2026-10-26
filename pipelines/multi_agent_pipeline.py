@@ -4,7 +4,7 @@ import json
 from dataclasses import asdict
 
 from llm.llm_config import SUB_AGENT_MODEL
-from models import SchedulerConfig, TaskPriority
+from models import SchedulerConfig, TaskDecompositionResult, TaskPriority
 from multi_agent_pool.workflow import WorkflowManager
 from question_solution.task_decomposer import TaskDecomposer
 from semantic_matcher import SemanticMatcher
@@ -61,6 +61,7 @@ def _feasibility(tasks, agents, config):
 def run_multi_agent_flow(
     llm, task_title, task_description, sub_agent_model_name=SUB_AGENT_MODEL,
     final_summary_instruction="", semantic_matcher=None, scheduler_config=None,
+    fixed_subtasks=None,
 ):
     config = scheduler_config or SchedulerConfig()
     tracker = UsageTracker(config)
@@ -72,25 +73,34 @@ def run_multi_agent_flow(
         try:
             decomposer = TaskDecomposer(llm_interface=llm)
             task = decomposer.create_task(task_title, task_description, TaskPriority.HIGH)
-            cache = DecompositionCache(config.plan_cache_path)
-            cache_key = plan_cache_key(
-                task_title, task_description, getattr(llm, "model_name", ""),
-                config.max_plan_tasks, config.allow_direct_plan,
-            )
-            cached_plan = cache.get(cache_key)
-            decomposition = decomposer.decompose(
-                task,
-                max_subtasks=config.max_plan_tasks,
-                allow_direct=config.allow_direct_plan,
-                llm_response=cached_plan,
-            )
-            if cached_plan is None and decomposer.last_llm_response:
-                cache.put(cache_key, decomposer.last_llm_response)
-            result["plan_cache"] = {
-                "enabled": bool(config.plan_cache_path),
-                "hit": cached_plan is not None,
-                "key": cache_key,
-            }
+            if fixed_subtasks is None:
+                cache = DecompositionCache(config.plan_cache_path)
+                cache_key = plan_cache_key(
+                    task_title, task_description, getattr(llm, "model_name", ""),
+                    config.max_plan_tasks, config.allow_direct_plan,
+                )
+                cached_plan = cache.get(cache_key)
+                decomposition = decomposer.decompose(
+                    task,
+                    max_subtasks=config.max_plan_tasks,
+                    allow_direct=config.allow_direct_plan,
+                    llm_response=cached_plan,
+                )
+                if cached_plan is None and decomposer.last_llm_response:
+                    cache.put(cache_key, decomposer.last_llm_response)
+                result["plan_cache"] = {
+                    "enabled": bool(config.plan_cache_path),
+                    "hit": cached_plan is not None,
+                    "key": cache_key,
+                }
+                result["plan_source"] = "planner"
+            else:
+                # Fixed plans are supplied by an evaluation adapter; no gold plan reaches the planner.
+                if not fixed_subtasks:
+                    raise ValueError("Fixed plan must contain at least one subtask")
+                decomposition = TaskDecompositionResult(task, list(fixed_subtasks), "External fixed DAG")
+                result["plan_cache"] = {"enabled": False, "hit": False, "key": ""}
+                result["plan_source"] = "fixed"
             result["decomposition"] = decomposition.to_dict()
             _validate_dag(decomposition.sub_tasks)
             manager = WorkflowManager(model_name=sub_agent_model_name)

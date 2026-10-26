@@ -12,7 +12,7 @@ from unittest.mock import patch
 # Imports create SDK clients, but these tests never use a real transport.
 os.environ.setdefault("SILICONFLOW_API_KEY", "test-key")
 
-from models import SchedulerConfig
+from models import SchedulerConfig, SubTask
 from llm.llm_interface import SiliconFlowLLMInterface
 from pipelines.multi_agent_pipeline import run_multi_agent_flow
 from services.single_llm_solver import solve_with_single_llm
@@ -89,6 +89,20 @@ class PipelineTests(unittest.TestCase):
                              ["decomposition", "reasoning", "reasoning", "final"])
             self.assertTrue(all(c["enable_thinking"] is False for c in result["usage"]["calls"]))
             json.dumps(result)
+
+    def test_fixed_plan_skips_planner_and_preserves_source(self):
+        orchestrator = SiliconFlowLLMInterface(client=FakeClient([]), model_name="mock")
+        agent = FakeClient([output(), output()])
+        fixed = [SubTask("fixed:0", "calculate", "calculate the requested value",
+                         metadata={"allowed_agent_ids": ["reasoningagent"]})]
+        with patch("multi_agent_pool.workflow.sub_agent_llm_model", agent), \
+             contextlib.redirect_stdout(io.StringIO()):
+            result = run_multi_agent_flow(orchestrator, "test", "calculate",
+                                          fixed_subtasks=fixed, semantic_matcher=Matcher())
+        self.assertEqual(result["plan_source"], "fixed")
+        self.assertEqual(result["decomposition"]["sub_tasks"][0]["id"], "fixed:0")
+        self.assertEqual(result["stop_reason"], "completed", result)
+        self.assertEqual(orchestrator.client.requests, [])
 
     def test_reasoning_agent_receives_complete_original_task(self):
         original = "Question: choose the correct option. Options: A. 10 B. 42"

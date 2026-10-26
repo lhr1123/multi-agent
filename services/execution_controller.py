@@ -188,7 +188,17 @@ class ExecutionController:
             chosen = assign_with_capacities(matrix, capacities, feasible, self.config.policy,
                                            self.config.seed + len(self.state.rounds))
             pairs = [(i, j) for i, j in zip(batch, chosen) if j >= 0]
+            # Conflict refers to the joint candidate wave, before assignment and deferral.
+            first_choices = []
+            for row, allowed in zip(raw, feasible):
+                options = [j for j, ok in enumerate(allowed) if ok and capacities[j] > 0]
+                first_choices.append(max(options, key=lambda j: (row[j], -j)) if options else -1)
+            capacity_conflict = any(first_choices.count(j) > capacities[j]
+                                    for j in range(len(self.agents)) if capacities[j] > 0)
             trace = {"round": len(self.state.rounds), "candidate_ids": [self.tasks[i].id for i in batch],
+                     "ready_ids": [self.tasks[i].id for i in ready],
+                     "eligible_ids": [self.tasks[i].id for i in eligible],
+                     "candidate_capacity_conflict": capacity_conflict,
                      "agent_ids": [a.agent_id for a in self.agents], "components": components,
                      "raw_scores": raw, "matching_scores": matrix, "feasible": feasible,
                      "capacities": capacities, "assignments": chosen,

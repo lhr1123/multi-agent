@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "scope": "pilot_offline_assignment_only",
+  "tools": {
+    "Summarization": {
+      "allowed_agent_ids": ["summerizeagent", "concludeagent"],
+      "reviewed": true,
+      "rationale": "Both personas describe summarizing or consolidating supplied information; this does not certify a Hugging Face model API implementation."
+    },
+    "Question Answering": {
+      "allowed_agent_ids": ["reasoningagent", "concludeagent"],
+      "reviewed": true,
+      "rationale": "Both personas describe deriving an answer from supplied context; this does not certify a Hugging Face model API implementation."
+    }
+  }
+}

@@ -1,5 +1,7 @@
 # Multi-Agent Task Allocation System
 
+TaskBench fixed-DAG offline assignment instructions: [docs/TASKBENCH.md](docs/TASKBENCH.md).
+
 当前多智能体流程默认使用滚动匈牙利调度；`--scheduler static` 可运行修正后的静态对照。
 运行参数、计账口径和测试命令见 [滚动调度说明](docs/ROLLING_SCHEDULER.md)。
 新评测使用 schema v2，请使用新的结果和断点路径。

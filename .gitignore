@@ -32,3 +32,4 @@ Thumbs.db
 # Dataset caches / large local artifacts
 dataset/MMLU-Pro/.cache/
 dataset/MMLU-Pro/data/
+dataset/taskbench/source/

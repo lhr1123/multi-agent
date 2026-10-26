@@ -151,6 +151,8 @@ def finalize_stats(stats: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def sample_key(sample: Dict[str, Any], benchmark: str) -> str:
+    if benchmark == "taskbench":
+        return str(sample.get("taskbench_id"))
     if benchmark == "mmlu-pro":
         return str(sample.get("question_id"))
     if benchmark == "gsm-hard":
@@ -205,7 +207,8 @@ def append_checkpoint_sample(
 
 
 def sort_samples(samples: Sequence[Dict[str, Any]], benchmark: str) -> List[Dict[str, Any]]:
-    key_name = "question_id" if benchmark == "mmlu-pro" else "dataset_index"
+    key_name = {"mmlu-pro": "question_id", "gsm-hard": "dataset_index",
+                "taskbench": "taskbench_id"}[benchmark]
 
     def sort_key(sample: Dict[str, Any]) -> Tuple[int, str]:
         value = sample.get(key_name)

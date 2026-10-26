@@ -10,19 +10,6 @@ import json
 import os
 import sys
 
-from evaluation.gsmhard_evaluator import evaluate_multi_agent_on_gsmhard
-from evaluation.mmlu_pro_evaluator import evaluate_multi_agent_on_mmlu_pro
-from llm.llm_config import (
-    SINGLE_BASELINE_MODEL,
-    SUB_AGENT_MODEL,
-    TASK_ORCHESTRATOR_MODEL,
-    single_baseline_llm_model,
-    task_orchestrator_llm_model,
-)
-from llm.llm_interface import SiliconFlowLLMInterface
-from pipelines.multi_agent_pipeline import run_multi_agent_flow
-from services.single_llm_solver import solve_with_single_llm
-from services.single_tool_solver import solve_with_single_tool_llm
 from models import SchedulerConfig
 
 
@@ -53,13 +40,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--dataset-path",
         type=str,
         default="dataset/gsm-hard/gsmhardv2.jsonl",
-        help="Dataset path. For GSM-hard use a jsonl file; for MMLU-Pro use the dataset directory or parquet file.",
+        help="GSM-hard JSONL, MMLU-Pro directory/parquet, or TaskBench data.json JSONL.",
     )
     parser.add_argument(
         "--benchmark",
         type=str,
         default="gsm-hard",
-        choices=["gsm-hard", "mmlu-pro"],
+        choices=["gsm-hard", "mmlu-pro", "taskbench"],
         help="Benchmark adapter used in dataset mode.",
     )
     parser.add_argument(
@@ -153,6 +140,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-direct-plan", action="store_true")
     parser.add_argument("--no-early-stop-optional", action="store_true")
     parser.add_argument("--no-feedback", action="store_true")
+    parser.add_argument("--taskbench-tool-map",
+                        help="Reviewed tool-to-eligible-agent JSON; omit for inventory only")
+    parser.add_argument("--taskbench-tools",
+                        help="TaskBench tool_desc.json; defaults to dataset sibling when present")
     return parser
 
 
@@ -201,6 +192,42 @@ def scheduler_config_from_args(args):
 def main() -> None:
     args = build_parser().parse_args()
     scheduler_config = scheduler_config_from_args(args)
+
+    if args.mode == "dataset" and args.benchmark == "taskbench":
+        from evaluation.taskbench_evaluator import evaluate_taskbench_offline
+
+        if args.run_kind != "multi" or args.compare_single:
+            raise ValueError("TaskBench first version supports offline assignment only")
+        if args.assignment_policy:
+            raise ValueError("TaskBench offline compares all three assignment policies")
+
+        data_path = ("dataset/taskbench/data.json" if args.dataset_path ==
+                     "dataset/gsm-hard/gsmhardv2.jsonl" else args.dataset_path)
+        report = evaluate_taskbench_offline(
+            data_path=data_path,
+            save_path=args.save_path or "result/taskbench_offline.json",
+            config=scheduler_config,
+            tool_map_path=args.taskbench_tool_map,
+            tool_desc_path=args.taskbench_tools,
+            offset=args.dataset_offset,
+            limit=None if args.dataset_limit <= 0 else args.dataset_limit,
+            checkpoint_path=args.checkpoint_path,
+            resume=args.resume,
+        )
+        print(json.dumps(report["summary"], ensure_ascii=False, indent=2))
+        return
+
+    # Keep the offline TaskBench path independent of API credentials and clients.
+    from evaluation.gsmhard_evaluator import evaluate_multi_agent_on_gsmhard
+    from evaluation.mmlu_pro_evaluator import evaluate_multi_agent_on_mmlu_pro
+    from llm.llm_config import (
+        SINGLE_BASELINE_MODEL, SUB_AGENT_MODEL, TASK_ORCHESTRATOR_MODEL,
+        single_baseline_llm_model, task_orchestrator_llm_model,
+    )
+    from llm.llm_interface import SiliconFlowLLMInterface
+    from pipelines.multi_agent_pipeline import run_multi_agent_flow
+    from services.single_llm_solver import solve_with_single_llm
+    from services.single_tool_solver import solve_with_single_tool_llm
 
     orchestrator_llm = SiliconFlowLLMInterface(
         client=task_orchestrator_llm_model,

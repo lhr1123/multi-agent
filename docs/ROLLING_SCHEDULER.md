@@ -1,5 +1,11 @@
 # Rolling Hungarian Scheduler
 
+Updated 2026-10-27. TaskBench fixed-DAG offline replay uses this controller
+with a local success stub and frozen per-sample semantic score matrix; it does
+not exercise LLM planning, external tools, or answer correctness. See
+[TaskBench offline assignment](TASKBENCH.md) for its separate entrypoint and
+experiment limits.
+
 ## Scope
 
 The default scheduler is `rolling-hungarian`. A minimal planner first chooses
@@ -129,6 +135,12 @@ and usage. Every sub-agent receives the original task, current work item,
 dependency evidence, candidates, prior attempts and remaining budget. Final
 aggregation reads compact structured evidence plus unresolved tasks; raw outputs
 remain in the trace. MMLU-Pro no longer guesses random answers on parse failure.
+
+Each rolling round also records `ready_ids` and `eligible_ids` before the
+`max_parallel` cutoff, `candidate_ids` after the cutoff, and
+`candidate_capacity_conflict` for candidates whose top feasible agent is
+oversubscribed. The conflict flag describes the candidate wave, not all
+ready tasks outside that wave. Report round and sample denominators separately.
 
 Checkpoints include model/sampling settings, scheduler configuration, code hash,
 Git commit and endpoint fingerprints. Resume rejects incompatible or legacy

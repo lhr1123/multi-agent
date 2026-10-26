@@ -5,6 +5,13 @@
 > configuration and experiment constraints. The static flow below describes
 > the original architecture.
 
+> Updated 2026-10-27: `main.py` also routes TaskBench to a separate offline
+> adapter. That adapter reads reference tool DAGs, filters them through an
+> explicit tool-to-agent eligibility map, scores each accepted node once,
+> and replays Hungarian, greedy and random assignment through the existing
+> controller with simulated successful execution. It does not run tools or
+> measure answer accuracy. See [TaskBench offline assignment](TASKBENCH.md).
+
 ## Goal
 
 这个项目实现的是一个“由大模型驱动分工、由 embedding + 匈牙利算法完成分配、由子智能体执行、由终止智能体汇总结果”的多智能体任务处理框架。
@@ -50,12 +57,18 @@ User Task
 
 - `multi_agent_pipeline.py`: 任务分解、agent 分配、依赖执行、终止汇总
 
+`run_multi_agent_flow(..., fixed_subtasks=...)` can also accept an externally
+provided DAG and skip the planner. The source is marked `plan_source=fixed`
+in its trace; the normal path is marked `plan_source=planner`.
+
 ### `evaluation/`
 
 负责数据集级评测流程。
 
 - `gsmhard_evaluator.py`: GSM-hard 样本循环、指标统计、结果落盘、图表生成
 - `mmlu_pro_evaluator.py`: MMLU-Pro 样本循环、多选答案抽取、分类别统计、结果落盘
+- `taskbench_evaluator.py`: TaskBench JSONL inventory, reviewed eligibility
+  filtering, fixed-DAG offline policy replay, exclusion accounting and checkpointing
 
 ### `services/`
 
